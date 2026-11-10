@@ -1,35 +1,54 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AgentGate · Agent oversight</title><link rel="stylesheet" href="/static/styles.css"><script src="/static/app.js" defer></script></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentGate · Overview</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
 <body>
-<header><a class="brand" href="/">◈ AgentGate</a><span class="environment">LOCAL DEMO · SYNTHETIC DATA</span></header>
-<nav aria-label="Main navigation"><a href="/" data-nav>Overview & demo</a><a href="/agents" data-nav>Agent inventory</a><a href="/activity" data-nav>Activity & decisions</a></nav>
-<main>
-<section class="connection" aria-label="Reviewer connection"><label for="token">Reviewer access token</label><div class="connect-row"><input id="token" type="password" autocomplete="off" placeholder="Enter your local reviewer token"><button id="connect">Connect</button><button id="disconnect" class="secondary" hidden>Disconnect</button></div><p id="status" role="status">Connect to load activity. Your token stays in this tab’s memory.</p></section>
-<div id="home-page"><section class="intro"><div class="eyebrow">AGENT SECURITY & GOVERNANCE</div><h1>Know what your agents do.<br><span>Control what happens next.</span></h1><p>Inspect tool activity, understand policy decisions, and review sensitive actions in one place.</p></section>
-<section class="metrics" aria-label="Activity summary"><article><span>ALL RECORDED ACTIONS</span><strong id="total">—</strong></article><article><span>BLOCKED BY POLICY</span><strong id="denied">—</strong></article><article><span>AWAITING REVIEW</span><strong id="pending">—</strong></article><article><span>EXECUTED</span><strong id="executed">—</strong></article></section><div class="overview-links"><a href="/agents" data-nav id="known-agents">View agent inventory →</a><a href="/activity?outcome=pending" data-nav>Review pending approvals →</a></div><section class="demo-panel" aria-labelledby="demo-title">
-<div class="section-heading"><div><div class="eyebrow">INTERACTIVE DEMO</div><h2 id="demo-title">Run one scenario at a time</h2><p>Choose an agent, then run its cases one by one. All actions are simulated.</p></div><span class="environment" id="live-state">CONNECT TO BEGIN</span></div>
-<label for="demo-agent">Demo agent</label><select id="demo-agent"><option value="support-agent">Support agent · 6 cases</option><option value="sales-agent">Sales assistant · 4 cases</option><option value="finance-agent">Finance assistant · 4 cases</option></select><div id="scenarios" class="scenario-grid"><div class="empty">Connect with your reviewer token to run scenarios here.</div></div>
-</section>
-<section class="integration-panel" aria-labelledby="integration-title">
-<div class="section-heading"><div><div class="eyebrow">REAL AGENT SHOWCASE</div><h2 id="integration-title">Connect your first real agent</h2><p>A dedicated place to add a model-driven demo as the product grows.</p></div><span class="badge pending">Not connected</span></div>
-<p class="help">These demo cases are scripted. This integration slot is a scaffold; it has no live model, provider credentials, or agent process attached.</p>
-<details><summary>How to plug in an agent</summary><ol class="integration-steps"><li>Implement your model or framework adapter in <code>examples/real_agent_demo.py</code>.</li><li>Return proposed tool calls through <code>agentgate.client.GatewayClient</code>. AgentGate evaluates and executes them.</li><li>Run the adapter locally and watch its actions appear in the activity feed. Refunds requiring approval pause for your decision.</li></ol><p class="help">This slot does not launch code from the browser. Its label describes scaffold readiness, not live connection monitoring. Model inventory entries are maintained separately.</p><pre>.venv/bin/python examples/real_agent_demo.py</pre></details>
-</section>
+<a class="skip-link" href="#workspace">Skip to workspace</a>
+<header class="app-header">
+  <a class="brand" href="/" data-nav><span class="brand-mark" aria-hidden="true">a<span>g</span></span>AgentGate</a>
+  <span class="workspace-label">Agent oversight</span>
+  <span class="environment"><span class="status-dot" aria-hidden="true"></span>Demo workspace</span>
+</header>
+<nav aria-label="Main navigation">
+  <a href="/" data-nav>Overview</a>
+  <a href="/agents" data-nav>Agents</a>
+  <a href="/activity" data-nav>Activity & decisions</a>
+</nav>
+<main id="workspace" tabindex="-1">
+  <section class="connection" aria-labelledby="access-title">
+    <div class="connection-copy"><h2 id="access-title">Reviewer access</h2><p id="token-help">Use your reviewer token from the local <code>.env</code> file. It stays in this tab’s memory.</p></div>
+    <div class="access-controls"><label for="token" class="sr-only">Reviewer access token</label><div class="connect-row"><input id="token" type="password" autocomplete="off" aria-describedby="token-help" placeholder="Enter reviewer token"><button id="connect">Connect</button><button id="disconnect" class="secondary" hidden>Disconnect</button></div></div>
+    <p id="status" role="status">Not connected. Connect to load your workspace.</p>
+    <p id="last-updated" class="updated">No data loaded yet</p>
+  </section>
 
-<section class="recent-panel"><div class="section-heading"><div><h2>Recent activity</h2><p>A quick look at the latest three actions.</p></div><a href="/activity" data-nav>View all activity →</a></div><div id="recent-actions" class="empty">Connect to see recent activity.</div></section>
-</div>
-<div id="agents-page" hidden><section class="page-intro"><div class="eyebrow">AGENT INVENTORY</div><h1>Your agents, in one place.</h1><p>Browse agents, inspect access, and maintain their profiles. Deployment locations below are demo configurations.</p></section><label for="directory-search">Find an agent</label><input id="directory-search" placeholder="Search names, teams, or locations" type="search"><p id="agent-count" class="help"></p><div id="agent-directory" class="agent-directory"></div><section class="profile-panel" id="profile-panel" hidden aria-labelledby="profile-title"><div class="section-heading"><div><div class="eyebrow">AGENT INVENTORY</div><h2 id="profile-title">Ongoing agent profile</h2><p>Persistent inventory, enforced permissions, and lifetime activity.</p></div></div>
-<div id="profile-summary" class="empty">Connect to load this agent’s profile.</div>
-<details id="profile-editor" hidden><summary>Edit profile & model inventory</summary>
-<p class="help">Register provider and model names only. Entries are unverified inventory; adding one does not connect an LLM. Do not enter API keys.</p>
-<form id="profile-form"><label for="agent-name">Display name</label><input id="agent-name" maxlength="100" required><label for="agent-description">Description</label><textarea id="agent-description" maxlength="500" rows="2"></textarea>
-<h3>Registered LLM connections</h3><div id="model-rows"></div><button type="button" id="add-model" class="secondary">Add model</button><button type="submit" id="save-profile">Save profile</button><p id="profile-status" role="status"></p></form></details>
-<details id="profile-history" hidden><summary>Profile change history</summary><div id="history-list"></div></details>
-</section>
-</div>
-<div id="activity-page" hidden><section class="page-intro"><div class="eyebrow">ACTIVITY & DECISIONS</div><h1>Focus on what needs attention.</h1><p>Search and filter the audit history. Only one page of results loads at a time.</p></section>
-<form id="activity-filters" class="filter-bar"><div><label for="activity-agent">Agent</label><select id="activity-agent"><option value="">All agents</option></select></div><div><label for="filter">Decision</label><select id="filter"><option value="">All decisions</option><option value="pending">Needs approval</option><option value="denied">Blocked</option><option value="executed">Executed</option><option value="rejected">Rejected</option></select></div><div><label for="risk-filter">Risk</label><select id="risk-filter"><option value="">All levels</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div><div class="search-field"><label for="activity-search">Search activity</label><input id="activity-search" placeholder="Search tools, explanations, or run IDs" maxlength="100" type="search"></div><button type="submit">Apply filters</button></form>
-<div class="section-heading"><p id="activity-count" role="status">Connect to view activity.</p><button id="refresh" class="secondary">Refresh</button></div><div id="actions"></div><div class="pagination"><button id="newer" class="secondary" disabled>← Newer</button><span id="page-label">20 actions per page</span><button id="older" class="secondary" disabled>Older →</button></div></div>
-<footer>AgentGate v0.3 · Rule-based enforcement · All tool effects are simulated</footer>
-</main></body></html>
+  <div id="home-page">
+    <section class="page-intro"><div><p class="eyebrow">Overview</p><h1>Your agents at a glance</h1><p>Review requests, understand recent actions, and keep track of agent access.</p></div><span class="scope-note">All recorded demo activity</span></section>
+    <section class="attention-panel" aria-labelledby="attention-title"><div><p class="eyebrow">Needs attention</p><h2 id="attention-title">Connect to see requests awaiting review</h2><p id="attention-description">Sensitive actions pause until a reviewer makes a decision.</p></div><a class="button-link" href="/activity?outcome=pending" data-nav>Review requests <span aria-hidden="true">→</span></a></section>
+    <section class="metrics" aria-label="All recorded demo activity"><article><span>Awaiting review</span><strong id="pending">—</strong></article><article><span>Blocked by policy</span><strong id="denied">—</strong></article><article><span>Executed in simulation</span><strong id="executed">—</strong></article><article><span>Total actions</span><strong id="total">—</strong></article></section>
+    <div class="coverage-strip"><a href="/agents" data-nav id="known-agents">View registered agents →</a><p>Coverage: registered demo agents only. Live discovery is not connected.</p></div>
+    <section class="recent-panel" aria-labelledby="recent-title"><div class="section-heading"><div><h2 id="recent-title">Recent activity</h2><p>The three latest actions across your agents.</p></div><a href="/activity" data-nav>View all activity →</a></div><div id="recent-actions" class="empty">Connect to see recent activity, then run a demo to add actions.</div></section>
+    <details class="demo-panel" open><summary><span><span class="eyebrow">Explore the prototype</span><span id="demo-title" class="summary-title">Try an interactive demo</span></span><span class="environment" id="live-state">Not connected</span></summary><div class="panel-body"><p class="help">Choose an agent and run a case. Requests pass through the gateway, but every business action is simulated.</p><div class="field-inline"><label for="demo-agent">Demo agent</label><select id="demo-agent"><option value="support-agent">Support agent · 6 cases</option><option value="sales-agent">Sales assistant · 4 cases</option><option value="finance-agent">Finance assistant · 4 cases</option></select></div><div id="scenarios" class="scenario-grid"><div class="empty">Connect with a reviewer token to try the cases.</div></div></div></details>
+    <details class="integration-panel"><summary><span><span class="eyebrow">Planned integration</span><span id="integration-title" class="summary-title">Bring your own agent</span></span><span class="badge unverified">Not connected</span></summary><div class="panel-body"><p class="help">A starting point for a future model-driven demo. No live model or agent process is attached.</p><ol class="integration-steps"><li>Implement the adapter in <code>examples/real_agent_demo.py</code>.</li><li>Route proposed actions through <code>agentgate.client.GatewayClient</code> so policy checks remain enforced.</li><li>Run it locally and inspect the resulting activity. Sensitive actions still need reviewer approval.</li></ol><pre>.venv/bin/python examples/real_agent_demo.py</pre><p class="help">This scaffold does not launch processes from the browser or verify live connections.</p></div></details>
+  </div>
+
+  <div id="agents-page" hidden>
+    <section class="page-intro"><div><p class="eyebrow">Agents</p><h1>Understand who has access</h1><p>Compare your agents, then open a profile to inspect permissions and recorded activity.</p></div><span class="scope-note">Locations are simulated</span></section>
+    <section id="directory-panel" aria-labelledby="directory-title"><div class="directory-toolbar"><h2 id="directory-title">Registered agents</h2><div><label for="directory-search" class="sr-only">Find an agent</label><input id="directory-search" placeholder="Search names, teams, or locations" type="search"></div></div><p id="agent-count" class="help">Connect to load your agent inventory.</p><div class="table-scroll"><table class="agent-table"><caption class="sr-only">Registered demo agents and their observation state</caption><thead><tr><th scope="col">Agent & purpose</th><th scope="col">Owner</th><th scope="col">Location</th><th scope="col">Observation</th><th scope="col">Last activity</th><th scope="col"><span class="sr-only">Profile</span></th></tr></thead><tbody id="agent-directory"></tbody></table></div><p class="coverage-note">Registered inventory is not proof of a live connection. Exposure assessments are not available yet.</p></section>
+    <section class="profile-panel" id="profile-panel" hidden aria-labelledby="profile-title"><div class="section-heading"><div><p class="eyebrow">Agent detail</p><h2 id="profile-title">Access & activity</h2><p>Permissions enforced by the gateway. Model entries remain unverified inventory.</p></div><a href="/agents" data-nav>← All agents</a></div><div id="profile-summary" class="empty">Connect to load this profile.</div><details id="profile-editor" hidden><summary>Edit profile & model inventory</summary><p class="help">Register provider and model names only. Adding a large language model (LLM) entry does not connect it. Never enter API keys.</p><form id="profile-form"><label for="agent-name">Display name</label><input id="agent-name" maxlength="100" required><label for="agent-description">Purpose</label><textarea id="agent-description" maxlength="500" rows="3"></textarea><h3>Registered model connections</h3><div id="model-rows"></div><div class="form-actions"><button type="button" id="add-model" class="secondary">Add model</button><button type="submit" id="save-profile">Save changes</button></div><p id="profile-status" role="status"></p></form></details><details id="profile-history" hidden><summary>Profile change history</summary><div id="history-list"></div></details></section>
+  </div>
+
+  <div id="activity-page" hidden>
+    <section class="page-intro"><div><p class="eyebrow">Activity & decisions</p><h1>Follow the decision trail</h1><p>Find what happened, understand why, and review actions that need your approval.</p></div><span class="scope-note">20 actions per page</span></section>
+    <form id="activity-filters" class="filter-bar"><div><label for="activity-agent">Agent</label><select id="activity-agent"><option value="">All agents</option></select></div><div><label for="filter">Decision</label><select id="filter"><option value="">All decisions</option><option value="pending">Awaiting review</option><option value="denied">Blocked</option><option value="executed">Executed</option><option value="rejected">Rejected</option></select></div><div><label for="risk-filter">Action risk</label><select id="risk-filter"><option value="">All levels</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div><div class="search-field"><label for="activity-search">Search activity</label><input id="activity-search" placeholder="Tool, explanation, or run ID" maxlength="100" type="search"></div><button type="submit">Apply filters</button></form>
+    <div class="section-heading result-heading"><p id="activity-count" role="status">Connect to view activity.</p><button id="refresh" class="secondary">Refresh activity</button></div><div id="actions"></div><div class="pagination"><button id="newer" class="secondary" disabled>← Newer</button><span id="page-label">20 actions per page</span><button id="older" class="secondary" disabled>Older →</button></div><p class="coverage-note">Action risk describes this request. It is not an assessment of overall agent safety or evidence of compromise.</p>
+  </div>
+  <footer><span>AgentGate · Local prototype</span><span>Synthetic tools and data. No live company systems are connected.</span></footer>
+</main>
+</body>
+</html>
