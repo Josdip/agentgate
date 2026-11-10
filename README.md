@@ -22,6 +22,10 @@ See [the interactive demo and profile guide](docs/live-demo-and-profile.md) for 
 
 Open **Rules** to view, add, edit, or remove the rules each agent actually uses. Changes are saved, versioned, and immediately enforced. Removing a rule blocks that tool; agents cannot change their own permissions. See [rule management and upgrade notes](docs/agent-rules.md), especially the handling of older pending approvals.
 
+## Security & compliance
+
+Inspect per-agent configured risks, blocked attempts, pending reviews and missing evidence. Each finding explains a fix and verification step. Record GDPR, HIPAA and EU AI Act applicability with a rationale; supporting gateway checks never claim legal certification. See [the assessment guide](docs/security-compliance.md).
+
 ## Theme preference
 
 Use **Dark theme** in the header to switch between light and dark. Your choice is remembered locally; credentials are not saved. See [theme behavior and verification](docs/theme-toggle.md).

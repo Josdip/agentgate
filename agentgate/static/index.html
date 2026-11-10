@@ -20,6 +20,7 @@
   <a href="/agents" data-nav>Agents</a>
   <a href="/activity" data-nav>Activity & decisions</a>
   <a href="/rules" data-nav>Rules</a>
+  <a href="/security" data-nav>Security & compliance</a>
 </nav>
 <main id="workspace" tabindex="-1">
   <section class="connection" data-access-mode="loading" aria-labelledby="access-title">
@@ -67,6 +68,20 @@
         <p class="help">Saving changes active permissions immediately. Pending approvals from an older policy must be rejected and submitted again.</p><div class="form-actions"><button id="save-rule" type="submit">Save rule</button><button id="cancel-rule" type="button" class="secondary">Cancel</button></div><p id="rule-form-status" role="status"></p></form>
       </section>
       <details><summary>Rule change history</summary><p class="help">Latest 20 revisions. Historical snapshots remain stored, including deleted rules.</p><div id="rules-history"></div></details>
+    </div>
+  </div>
+  <div id="security-page" hidden>
+    <section class="page-intro"><div><p class="eyebrow">Security & compliance</p><h1>Know what needs attention</h1><p>Understand agent access, review attempted actions, and plan the next fix.</p></div><span class="scope-note">Synthetic demo · Limited assessment</span></section>
+    <section class="rules-guards"><h2>What this assessment can tell you</h2><p>Checks use saved agent rules and recorded gateway activity. Regulatory applicability is your team's declaration. Legal compliance, real vulnerabilities and compromise are not independently verified.</p></section>
+    <div class="rules-toolbar"><div class="field-inline"><label for="security-agent">Assess an agent</label><select id="security-agent" disabled><option value="">Loading agents…</option></select></div><button id="refresh-security" class="secondary">Refresh assessment</button></div>
+    <p id="security-status" role="status">Loading assessment…</p>
+    <div id="security-content" hidden>
+      <div id="security-summary" class="coverage-strip"></div>
+      <section aria-labelledby="findings-title"><div class="section-heading"><div><h2 id="findings-title">Risks & recommended fixes</h2><p>Configured access, observed attempts, and missing evidence are shown separately.</p></div><a id="security-activity" data-nav>Inspect agent activity →</a></div><div id="security-findings" class="security-grid"></div></section>
+      <details class="rules-guards"><summary>Recent decision evidence (latest 5)</summary><div id="security-evidence"></div></details>
+      <section aria-labelledby="compliance-title"><div class="section-heading"><div><h2 id="compliance-title">Regulations to review</h2><p>Choose whether each regulation applies to this workflow and record why. An applicability decision is not a compliance verdict.</p></div></div><div id="security-frameworks" class="security-grid"></div></section>
+      <section aria-labelledby="controls-title"><h2 id="controls-title">Supporting control evidence</h2><p class="help">These limited gateway checks can support a review. They do not cover every requirement of any regulation.</p><div id="security-controls" class="security-grid"></div></section>
+      <section class="rules-guards"><h2>Try it in the demo</h2><p>Run an unauthorised document or message case from Overview, then return here to see the blocked attempt. Change a monetary rule to require review for every request to remove its automatic-spending finding. Historical attempts and missing real-world evidence remain visible.</p><a href="/" data-nav>Choose a demo case →</a></section>
     </div>
   </div>
   <dialog id="delete-rule-dialog" aria-labelledby="delete-rule-title"><h2 id="delete-rule-title">Delete this rule?</h2><p id="delete-rule-message"></p><p>The tool will be blocked for this agent. This change is recorded in history and invalidates older pending approvals.</p><div class="form-actions"><button id="cancel-rule-delete" type="button" class="secondary" autofocus>Keep rule</button><button id="confirm-rule-delete" type="button" class="reject">Delete rule</button></div><p id="delete-rule-status" role="status"></p></dialog>

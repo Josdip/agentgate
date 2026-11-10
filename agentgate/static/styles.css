@@ -360,3 +360,13 @@ dialog p { max-width: 65ch; color: var(--muted); }
 .welcome-demo .help { margin-bottom: 0; }
 .welcome-demo button { flex-shrink: 0; }
 @media(max-width:760px) { .welcome-demo { flex-direction: column; align-items: stretch; } .welcome-demo button { align-self: start; } .connection[data-access-mode="demo"] { grid-template-columns: 1fr; } .connection[data-access-mode="demo"] #last-updated { grid-column: 1; grid-row: auto; } }
+
+/* Evidence and compliance cards share both theme palettes. */
+.security-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:16px; margin:16px 0 28px; }
+.security-card { border:1px solid var(--border); border-radius:12px; padding:20px; background:var(--surface); min-width:0; overflow-wrap:anywhere; }
+.security-card h3 { margin:8px 0 12px; font-size:1.15rem; }
+.security-card h4 { margin:16px 0 6px; }
+.security-card p { line-height:1.6; }
+.security-card label { display:block; margin-top:16px; }
+.security-card select,.security-card textarea { width:100%; margin:6px 0 12px; }
+#security-page > section,#security-content > section { margin-bottom:24px; }

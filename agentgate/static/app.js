@@ -3,6 +3,8 @@ let token = '';
 let demoAccess = false;
 let accessMode = 'loading';
 let accessBusy = false;
+let securityAgentId='support-agent';
+let securityState=null;
 const hasAccess = () => demoAccess || Boolean(token);
 let actions = [];
 const $ = (id) => document.getElementById(id);
@@ -57,8 +59,8 @@ async function api(path, options = {}) {
   if(requestSession!==sessionVersion || !hasAccess()) throw new Error('Your access changed. Connect again to continue.');
   if(!response.ok) {
     if(response.status===401){if(demoAccess)$('retry-demo').hidden=false;throw new Error(demoAccess?'The demo connection expired. Select Retry connection or reload the page.':'Access was not accepted. Check your reviewer credential, then reconnect.');}
-    if(response.status===409) throw new Error(path.includes('/rules')?'Rules changed or this tool already has a rule. Refresh rules, then reopen the editor.':path.endsWith('/review')?'This request was already reviewed or its permissions changed. Refresh activity; if still pending, reject it and submit a new request.':'This record changed. Refresh activity, or reopen the agent profile before saving.');
-    if(response.status===422) throw new Error(path.includes('/rules')?'Rule values were not accepted. Choose a registered tool, unique exact targets, and a valid approval limit.':'Some values are not valid. Check field lengths and provider/model names; model entries must be unique.');
+    if(response.status===409) throw new Error(path.includes('/compliance/')?'Applicability changed. Refresh the assessment, then review and save your decision again.':path.includes('/rules')?'Rules changed or this tool already has a rule. Refresh rules, then reopen the editor.':path.endsWith('/review')?'This request was already reviewed or its permissions changed. Refresh activity; if still pending, reject it and submit a new request.':'This record changed. Refresh activity, or reopen the agent profile before saving.');
+    if(response.status===422) throw new Error(path.includes('/compliance/')?'Choose a valid applicability status and explain it in 10–500 characters.':path.includes('/rules')?'Rule values were not accepted. Choose a registered tool, unique exact targets, and a valid approval limit.':'Some values are not valid. Check field lengths and provider/model names; model entries must be unique.');
     throw new Error(`AgentGate could not complete this request (${response.status}). Please retry.`);
   }
   const result=await response.json();
@@ -290,6 +292,7 @@ function showLoadError(error) {
   describeUpdate();
   if(cached) $('last-updated').textContent+=' · may be out of date';
   if(demoAccess)$('retry-demo').hidden=false;
+  if(location.pathname==='/security')$('security-status').textContent=cached?'Assessment may be out of date. Refresh before acting.':'Assessment unavailable. Check the connection and retry.';
   if(location.pathname==='/rules')$('rules-status').textContent=cached?'Rules may be out of date. Refresh before making changes.':'Rules are unavailable. Check your connection and retry.';
   if(!cached) {
     if(location.pathname==='/') {
@@ -341,6 +344,12 @@ async function load(quiet=false) {
       $('activity-count').textContent=`${page.total} matching ${page.total===1?'action':'actions'} · Showing ${page.items.length} · ${before?'Older results; automatic updates paused':'Newest first'}`;
       $('older').disabled=!nextCursor;$('newer').disabled=!cursorStack.length;
       $('page-label').textContent=`Page ${cursorStack.length+1} · Up to 20 actions`;
+    } else if(pagePath==='/security') {
+      populateSecurityAgents();
+      const selected=securityAgentId;
+      const next=await api(`/api/agents/${encodeURIComponent(selected)}/security`);
+      if(!isCurrent() || selected!==securityAgentId)return;
+      securityState=next;renderSecurity();
     } else if(pagePath==='/rules') {
       populateRulesAgents();
       if(!agents.some(agent=>agent.agent_id===rulesAgentId))throw new Error('Agent not found. Choose a registered agent.');
@@ -369,6 +378,8 @@ function route() {
   if($('delete-rule-dialog').open){$('delete-rule-dialog').close();pendingRuleDelete=null;}
   routeVersion++;
   const path=location.pathname;
+  $('security-page').hidden=path!=='/security';
+  if(path==='/security'){securityAgentId=new URLSearchParams(location.search).get('agent_id')||'support-agent';securityState=null;$('security-content').hidden=true;$('security-status').textContent='Loading assessment…';}
   $('home-page').hidden=path!=='/';$('agents-page').hidden=!path.startsWith('/agents');$('activity-page').hidden=path!=='/activity';$('rules-page').hidden=path!=='/rules';
   activeProfileId=path.startsWith('/agents/') ? decodeURIComponent(path.split('/')[2]) : null;
   $('profile-panel').hidden=true;
@@ -382,7 +393,7 @@ function route() {
   if(path==='/rules'){rulesAgentId=query.get('agent_id')||'support-agent';rulesState=null;$('rules-workspace').hidden=true;$('rules-status').textContent=hasAccess()?'Loading rules…':'Opening rules…';closeRuleEditor();}
   for (const [id,key] of [['activity-agent','agent_id'],['filter','outcome'],['risk-filter','risk'],['activity-search','search']]) $(id).value=query.get(key)||'';
   document.querySelectorAll('nav a').forEach(link=>{const current=link.pathname==='/'?path==='/':path.startsWith(link.pathname);link.classList.toggle('active',current);if(current)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');});
-  document.title=`AgentGate · ${path.startsWith('/agents')?'Agents':path==='/activity'?'Activity & decisions':path==='/rules'?'Rules':'Overview'}`;
+  document.title=`AgentGate · ${path.startsWith('/agents')?'Agents':path==='/activity'?'Activity & decisions':path==='/rules'?'Rules':path==='/security'?'Security & compliance':'Overview'}`;
   if([...$('activity-agent').options].some(option=>option.value===requestedAgentFilter))requestedAgentFilter=null;
   describeUpdate();
   if (path === '/' && scenarioItems.length) renderScenarios();
@@ -392,7 +403,7 @@ document.addEventListener('click',event=>{
   const link=event.target.closest('a[data-nav]');
   if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.button!==0) return;
   event.preventDefault();history.pushState({},'',link.href);route();window.scrollTo(0,0);
-  const heading=document.querySelector('#home-page:not([hidden]) h1, #agents-page:not([hidden]) h1, #activity-page:not([hidden]) h1, #rules-page:not([hidden]) h1');
+  const heading=document.querySelector('#home-page:not([hidden]) h1, #agents-page:not([hidden]) h1, #activity-page:not([hidden]) h1, #rules-page:not([hidden]) h1, #security-page:not([hidden]) h1');
   if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
 });
 window.addEventListener('popstate',route);
@@ -407,6 +418,7 @@ $('disconnect').addEventListener('click',()=>{
   if($('delete-rule-dialog').open)$('delete-rule-dialog').close();
   $('rules-agent').replaceChildren(new Option('Connect to load agents',''));$('rules-agent').disabled=true;delete $('rules-agent').dataset.choices;
   $('activity-agent').replaceChildren(new Option('All agents',''));
+  securityState=null;$('security-content').hidden=true;$('security-frameworks').replaceChildren();$('security-findings').replaceChildren();$('security-controls').replaceChildren();$('security-evidence').replaceChildren();$('security-summary').replaceChildren();$('security-agent').replaceChildren(new Option('Connect to load agents',''));$('security-agent').disabled=true;delete $('security-agent').dataset.choices;
   sessionVersion++;token='';demoAccess=false;$('start-demo').disabled=true;actions=[];agents=[];profile=null;summary=null;scenarioItems=[];demoResults.clear();runningScenarios.clear();editorReady=false;loadedAt.clear();
   $('disconnect').hidden=true;
   $('scenarios').replaceChildren(element('div','Connect to run demo cases.','empty'));
@@ -606,3 +618,73 @@ $('start-demo').addEventListener('click',async()=>{
 });
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initializeAccess,{once:true});
 else if(document.readyState==='interactive'||document.readyState==='complete')initializeAccess();
+
+function populateSecurityAgents(){
+  const select=$('security-agent');
+  const choices=JSON.stringify(agents.map(a=>[a.agent_id,a.display_name]));
+  if(select.dataset.choices!==choices){select.replaceChildren(...agents.map(a=>new Option(a.display_name,a.agent_id)));select.dataset.choices=choices;}
+  select.disabled=false;select.value=securityAgentId;
+  if(!agents.some(a=>a.agent_id===securityAgentId))throw new Error('Agent not found. Choose a registered agent.');
+}
+function securityLink(text,href,external=false){
+  const link=element('a',text);link.href=href;
+  if(external){link.target='_blank';link.rel='noopener noreferrer';}else link.setAttribute('data-nav','');
+  return link;
+}
+function findingCard(finding){
+  const card=element('article',undefined,'security-card');
+  card.append(element('p',`${finding.kind} · ${finding.severity==='unknown'?'Unassessed severity':finding.severity+' priority'}`,'eyebrow'),element('h3',finding.title),element('p',finding.evidence));
+  const details=element('details');details.append(element('summary','Suggested fix & verification'),element('h4','Recommended fix'),element('p',finding.fix),element('h4','How to verify'),element('p',finding.verification));
+  details.append(securityLink('Review agent rules →',`/rules?agent_id=${encodeURIComponent(securityAgentId)}`),element('p'),securityLink('Read security guidance ↗',finding.source,true));card.append(details);return card;
+}
+function frameworkCard(framework){
+  const card=element('article',undefined,'security-card');
+  card.append(element('p',framework.focus,'eyebrow'),element('h3',framework.name),element('p',`Compliance: ${framework.compliance_status}`,'scope-note'),element('p',framework.scope));
+  const label={unknown:'Applicability not determined',applies:'Declared applicable',not_applicable:'Declared out of scope'}[framework.applicability];
+  card.append(element('p',label),element('p',framework.provenance,'help'));
+  const details=element('details');details.append(element('summary','Review applicability & next steps'),element('p',framework.next_steps),element('p',framework.reference,'help'),element('p',framework.control_review),element('p','Relevant gateway evidence: '+framework.supporting_controls.join('; '),'help'),securityLink('Official regulatory guidance ↗',framework.source,true));
+  card.dataset.savedScope=framework.applicability;card.dataset.savedRationale=framework.rationale;card.dataset.scopeRevision=String(framework.revision);
+  const form=element('form');const select=element('select');select.id=`scope-${framework.id}`;
+  for(const [value,text] of [['unknown','Not determined'],['applies','Applies to this workflow'],['not_applicable','Does not apply to this workflow']])select.append(new Option(text,value));select.value=framework.applicability;
+  const scopeLabel=element('label','Applicability');scopeLabel.setAttribute('for',select.id);
+  const note=element('textarea');note.id=`rationale-${framework.id}`;note.value=framework.rationale;note.required=true;note.minLength=10;note.maxLength=500;note.rows=3;
+  const noteLabel=element('label','Why? Record scope and evidence (no secrets)');noteLabel.setAttribute('for',note.id);
+  const save=element('button','Save applicability');save.type='submit';const message=element('p',undefined,'help');message.setAttribute('role','status');
+  const reload=element('button','Reload saved applicability');reload.type='button';reload.className='secondary';
+  reload.addEventListener('click',()=>{card.remove();renderSecurity();});
+  form.append(scopeLabel,select,noteLabel,note,save,reload,message);
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();const agent=securityAgentId,session=sessionVersion,version=routeVersion;save.disabled=true;
+    const submitted={revision:framework.revision,applicability:select.value,rationale:note.value};
+    try{
+      const next=await api(`/api/agents/${encodeURIComponent(agent)}/compliance/${framework.id}`,{method:'PUT',body:JSON.stringify(submitted)});
+      if(session!==sessionVersion||version!==routeVersion||agent!==securityAgentId)return;
+      card.dataset.savedScope=submitted.applicability;card.dataset.savedRationale=submitted.rationale;
+      securityState=next;renderSecurity();$('security-status').textContent='Applicability saved. This declaration does not establish compliance.';
+    }catch(error){if(session===sessionVersion&&version===routeVersion)message.textContent=error.message;}
+    finally{save.disabled=false;}
+  });
+  details.append(form);card.append(details);return card;
+}
+function scopeSignature(framework){
+  const key=securityAgentId+':'+framework.id;
+  const card=[...$('security-frameworks').children].find(node=>node.dataset.recordId===key);
+  if(card){
+    const select=card.querySelector('select'),note=card.querySelector('textarea');
+    if(select && note && (select.value!==card.dataset.savedScope || note.value!==card.dataset.savedRationale))return card.dataset.signature;
+  }
+  return JSON.stringify(framework);
+}
+function renderSecurity(){
+  const state=securityState;if(!state)return;
+  $('security-content').hidden=false;
+  $('security-status').textContent=`${state.display_name} · Owner: ${state.owner} · Policy revision ${state.policy_revision} · Checks ${state.catalog_version} · Assessed ${new Date(state.evaluated_at).toLocaleTimeString()}`;
+  syncRows($('security-evidence'),state.recent_evidence||[],a=>a.id,JSON.stringify,a=>{const row=element('p');row.append(securityLink(`${a.tool} · ${decisionLabel(a.outcome)} · ${new Date(a.created_at).toLocaleString()} · Policy revision ${a.policy_revision??'unknown'}`,`/activity?agent_id=${encodeURIComponent(securityAgentId)}&search=${encodeURIComponent(a.run_id)}`));return row;});
+  $('security-summary').textContent=`${state.findings.length} items to review · Blocked attempts: ${state.activity.denied} · ${state.activity.pending} awaiting review · Legal compliance not assessed`;
+  $('security-activity').href=`/activity?agent_id=${encodeURIComponent(securityAgentId)}`;
+  syncRows($('security-findings'),state.findings,f=>securityAgentId+':'+f.id,JSON.stringify,findingCard);
+  syncRows($('security-frameworks'),state.frameworks,f=>securityAgentId+':'+f.id,scopeSignature,frameworkCard);
+  syncRows($('security-controls'),state.controls,f=>securityAgentId+':'+f.name,JSON.stringify,control=>{const card=element('article',undefined,'security-card');card.append(element('h3',control.name),element('p',control.status,'scope-note'),element('p',control.evidence));return card;});
+}
+$('security-agent').addEventListener('change',()=>{history.pushState({},'',`/security?agent_id=${encodeURIComponent($('security-agent').value)}`);route();});
+$('refresh-security').addEventListener('click',()=>load());
