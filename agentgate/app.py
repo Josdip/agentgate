@@ -2,6 +2,7 @@
 
 import os
 import secrets
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Annotated, Literal
 from uuid import uuid4
@@ -28,7 +29,11 @@ class Review(StrictModel):
     approve: bool
 
 
-def create_app(db_path=None, agent_token=None, reviewer_token=None, agent_tokens=None):
+def create_app(
+    db_path=None, agent_token=None, reviewer_token=None, agent_tokens=None, demo_mode: bool = False
+):
+    if not isinstance(demo_mode, bool):
+        raise TypeError("demo_mode must be an explicit boolean")
     agent_token = agent_token or os.environ.get("AGENTGATE_AGENT_TOKEN", "")
     reviewer_token = reviewer_token or os.environ.get("AGENTGATE_REVIEWER_TOKEN", "")
     if min(len(agent_token), len(reviewer_token)) < 24 or agent_token == reviewer_token:
@@ -49,6 +54,7 @@ def create_app(db_path=None, agent_token=None, reviewer_token=None, agent_tokens
         raise RuntimeError(
             "Agent identities require distinct credentials of at least 24 characters."
         )
+    demo_cookie = secrets.token_urlsafe(32) if demo_mode else None
     store = Store(db_path or os.environ.get("AGENTGATE_DB", "data/agentgate.db"))
     app = FastAPI(
         title="AgentGate",
@@ -77,12 +83,41 @@ def create_app(db_path=None, agent_token=None, reviewer_token=None, agent_tokens
         )
         return response
 
+    def local_demo_request(request: Request, require_origin=False):
+        try:
+            local = request.client is not None and ip_address(request.client.host).is_loopback
+        except ValueError:
+            local = False
+        expected_origin = f"{request.url.scheme}://{request.headers.get('host', '')}"
+        origin = request.headers.get("origin")
+        if (
+            not local
+            or request.url.hostname not in {"127.0.0.1", "localhost"}
+            or request.headers.get("x-agentgate-demo") != "browser"
+            or request.headers.get("sec-fetch-site", "same-origin") not in {"same-origin", "none"}
+            or (origin is not None and origin != expected_origin)
+            or (require_origin and origin != expected_origin)
+        ):
+            raise HTTPException(
+                403, "Local demo access requires a same-origin loopback browser request"
+            )
+
     def require(expected):
-        def check(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]):
-            if credentials is None or not secrets.compare_digest(credentials.credentials, expected):
-                raise HTTPException(
-                    401, "Invalid credentials", headers={"WWW-Authenticate": "Bearer"}
-                )
+        def check(
+            request: Request,
+            credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+        ):
+            # Explicit bearer credentials never borrow a browser's reviewer session.
+            if credentials is not None:
+                if secrets.compare_digest(credentials.credentials.encode(), expected.encode()):
+                    return
+            elif demo_mode and request.cookies.get("agentgate_demo"):
+                local_demo_request(request, require_origin=request.method not in {"GET", "HEAD"})
+                if secrets.compare_digest(
+                    request.cookies["agentgate_demo"].encode(), demo_cookie.encode()
+                ):
+                    return
+            raise HTTPException(401, "Invalid credentials", headers={"WWW-Authenticate": "Bearer"})
 
         return check
 
@@ -103,6 +138,26 @@ def create_app(db_path=None, agent_token=None, reviewer_token=None, agent_tokens
     async def invalid_arguments(request, exc):
         # Avoid echoing potentially sensitive parameter values in validation errors.
         return JSONResponse({"detail": "Invalid tool arguments"}, status_code=422)
+
+    @app.get("/api/access-mode")
+    def access_mode():
+        return {"mode": "local-demo" if demo_mode else "authenticated"}
+
+    @app.post("/api/demo/session")
+    def start_demo_session(request: Request):
+        if not demo_mode:
+            raise HTTPException(404, "Local demo mode is not enabled")
+        local_demo_request(request, require_origin=True)
+        response = JSONResponse({"mode": "local-demo"})
+        response.set_cookie(
+            "agentgate_demo",
+            demo_cookie,
+            httponly=True,
+            samesite="strict",
+            secure=request.url.scheme == "https",
+            path="/api",
+        )
+        return response
 
     @app.get("/health")
     def health():

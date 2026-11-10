@@ -220,3 +220,43 @@ test('deleting a rule re-enables Add and leaves an explicit default-deny empty s
   assert.equal(document.getElementById('add-rule').disabled,false);
   assert.match(document.getElementById('rules-list').children[0].textContent,/All tool requests.*blocked/);
 });
+
+test('local demo initializes without a reviewer token or Authorization header', async () => {
+  const calls=[];
+  const {context,document}=workspace(async(path,options={})=>{
+    calls.push({path,options});
+    const data=path==='/api/access-mode'?{mode:'local-demo'}:path==='/api/demo/session'?{mode:'local-demo'}:path==='/api/overview'?{total:0,pending:0,denied:0,executed:0,agents:0,recent:[]}:[];
+    return {ok:true,json:async()=>data};
+  });
+  await context.initializeAccess();
+  assert.equal(vm.runInContext('hasAccess()',context),true);
+  assert.equal(vm.runInContext('token',context),'');
+  assert.equal(document.getElementById('manual-access').hidden,true);
+  assert.equal(document.getElementById('start-demo').disabled,false);
+  const request=calls.find(call=>call.path==='/api/agents');
+  assert.equal(request.options.headers.Authorization,undefined);
+  assert.equal(request.options.headers['X-AgentGate-Demo'],'browser');
+  assert.match(document.getElementById('status').textContent,/Demo ready/);
+});
+
+test('authenticated mode does not bootstrap a demo or automatically fetch private data', async () => {
+  const calls=[];
+  const {context,document}=workspace(async(path)=>{
+    calls.push(path);return {ok:true,json:async()=>({mode:'authenticated'})};
+  });
+  await context.initializeAccess();
+  assert.equal(vm.runInContext('hasAccess()',context),false);
+  assert.deepEqual(calls,['/api/access-mode']);
+  assert.equal(document.getElementById('manual-access').hidden,false);
+  assert.match(document.getElementById('status').textContent,/Authenticated mode/);
+});
+
+test('failed demo bootstrap offers retry and never invents loaded totals', async () => {
+  const {context,document}=workspace(async(path)=>({ok:path==='/api/access-mode',json:async()=>({mode:'local-demo'})}));
+  await context.initializeAccess();
+  assert.equal(vm.runInContext('hasAccess()',context),false);
+  assert.equal(document.getElementById('retry-demo').hidden,false);
+  assert.equal(document.getElementById('.connection').dataset.state,'error');
+  assert.match(document.getElementById('status').textContent,/localhost/);
+  assert.notEqual(document.getElementById('total').textContent,'0');
+});

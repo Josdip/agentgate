@@ -350,3 +350,13 @@ dialog::backdrop { background: rgb(8 18 32 / .65); }
 dialog p { max-width: 65ch; color: var(--muted); }
 #rule-form-status, #delete-rule-status { font-size: 14px; color: var(--reject-text); }
 @media(max-width:600px) { nav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); } nav a { min-height: 44px; text-align: center; padding-block: 10px; } .rules-toolbar { align-items: stretch; flex-direction: column; gap: 0; } .rules-toolbar button { align-self: start; } }
+.connection[data-access-mode="demo"] { grid-template-columns: 1fr auto; padding-block: 16px; }
+.connection[data-access-mode="demo"] .connection-copy { grid-column: 1; }
+.connection[data-access-mode="demo"] #status { grid-column: 1; }
+.connection[data-access-mode="demo"] #last-updated { grid-column: 2; grid-row: 2; }
+#retry-demo { align-self: center; }
+.welcome-demo { display: flex; align-items: center; justify-content: space-between; gap: 24px; border: 1px solid var(--attention-border); background: var(--nav-active); border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+.welcome-demo p { max-width: 70ch; color: var(--muted); }
+.welcome-demo .help { margin-bottom: 0; }
+.welcome-demo button { flex-shrink: 0; }
+@media(max-width:760px) { .welcome-demo { flex-direction: column; align-items: stretch; } .welcome-demo button { align-self: start; } .connection[data-access-mode="demo"] { grid-template-columns: 1fr; } .connection[data-access-mode="demo"] #last-updated { grid-column: 1; grid-row: auto; } }

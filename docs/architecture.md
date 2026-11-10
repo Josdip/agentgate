@@ -1,5 +1,7 @@
 # Architecture
 
+> Current launcher: local demo access is automatic; no reviewer token entry is needed. See [local demo access](local-demo-access.md). Bearer-token instructions below apply to optional authenticated mode.
+
 For the current editable policy layer, see [agent rules](agent-rules.md). Tables and thresholds below describe initial defaults; active permissions now come from stored, versioned per-agent rules.
 
 ## Implemented flow
