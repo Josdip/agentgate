@@ -19,6 +19,7 @@
   <a href="/" data-nav>Overview</a>
   <a href="/agents" data-nav>Agents</a>
   <a href="/activity" data-nav>Activity & decisions</a>
+  <a href="/rules" data-nav>Rules</a>
 </nav>
 <main id="workspace" tabindex="-1">
   <section class="connection" aria-labelledby="access-title">
@@ -49,6 +50,24 @@
     <form id="activity-filters" class="filter-bar"><div><label for="activity-agent">Agent</label><select id="activity-agent"><option value="">All agents</option></select></div><div><label for="filter">Decision</label><select id="filter"><option value="">All decisions</option><option value="pending">Awaiting review</option><option value="denied">Blocked</option><option value="executed">Executed</option><option value="rejected">Rejected</option></select></div><div><label for="risk-filter">Action risk</label><select id="risk-filter"><option value="">All levels</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div><div class="search-field"><label for="activity-search">Search activity</label><input id="activity-search" placeholder="Tool, explanation, or run ID" maxlength="100" type="search"></div><button type="submit">Apply filters</button></form>
     <div class="section-heading result-heading"><p id="activity-count" role="status">Connect to view activity.</p><button id="refresh" class="secondary">Refresh activity</button></div><div id="actions"></div><div class="pagination"><button id="newer" class="secondary" disabled>← Newer</button><span id="page-label">20 actions per page</span><button id="older" class="secondary" disabled>Older →</button></div><p class="coverage-note">Action risk describes this request. It is not an assessment of overall agent safety or evidence of compromise.</p>
   </div>
+  <div id="rules-page" hidden>
+    <section class="page-intro"><div><p class="eyebrow">Rules</p><h1>Set clear boundaries for each agent</h1><p>These saved rules determine what the gateway allows, blocks, or sends for review.</p></div><span class="scope-note">Changes take effect immediately</span></section>
+    <div class="rules-toolbar"><div class="field-inline"><label for="rules-agent">Agent</label><select id="rules-agent" disabled><option value="">Connect to load agents</option></select></div><button id="reload-rules" class="secondary">Refresh rules</button></div>
+    <p id="rules-status" role="status">Connect with your reviewer token to view and manage rules.</p>
+    <div id="rules-workspace" hidden>
+      <section class="rules-guards"><h2>Always enforced by AgentGate</h2><p>Unregistered tools and invalid inputs are blocked. Agents cannot edit rules or approve their own actions. A tool without a rule is blocked by default.</p></section>
+      <div class="section-heading"><div><h2 id="rules-heading">Agent rules</h2><p id="rules-revision"></p></div><button id="add-rule">Add rule</button></div>
+      <div id="rules-list"></div>
+      <section id="rule-editor" class="profile-panel" hidden aria-labelledby="rule-editor-title"><h2 id="rule-editor-title">Add rule</h2><p class="help">One rule per tool for this agent. Rules use exact targets, with no wildcards or executable expressions.</p>
+        <form id="rule-form"><label for="rule-name">Rule name</label><input id="rule-name" required maxlength="100"><label for="rule-tool">Tool</label><select id="rule-tool" required></select><label for="rule-decision">Decision</label><select id="rule-decision"><option value="allow">Allow within the approved targets</option><option value="review">Require review for every request</option><option value="deny">Block this tool entirely</option></select>
+        <div id="rule-scope-field"><label for="rule-scope">Approved targets — one per line</label><textarea id="rule-scope" rows="3" aria-describedby="rule-target-help"></textarea><p id="rule-target-help" class="help"></p></div>
+        <div id="rule-limit-field" hidden><label for="rule-limit">Automatic approval limit (USD per request)</label><input id="rule-limit" inputmode="decimal" value="100.00" aria-describedby="rule-limit-help"><p id="rule-limit-help" class="help">Amounts above this limit need review. Use 0 to require review for every positive amount. Maximum $10,000; this is not a cumulative budget.</p></div>
+        <p class="help">Saving changes active permissions immediately. Pending approvals from an older policy must be rejected and submitted again.</p><div class="form-actions"><button id="save-rule" type="submit">Save rule</button><button id="cancel-rule" type="button" class="secondary">Cancel</button></div><p id="rule-form-status" role="status"></p></form>
+      </section>
+      <details><summary>Rule change history</summary><p class="help">Latest 20 revisions. Historical snapshots remain stored, including deleted rules.</p><div id="rules-history"></div></details>
+    </div>
+  </div>
+  <dialog id="delete-rule-dialog" aria-labelledby="delete-rule-title"><h2 id="delete-rule-title">Delete this rule?</h2><p id="delete-rule-message"></p><p>The tool will be blocked for this agent. This change is recorded in history and invalidates older pending approvals.</p><div class="form-actions"><button id="cancel-rule-delete" type="button" class="secondary" autofocus>Keep rule</button><button id="confirm-rule-delete" type="button" class="reject">Delete rule</button></div><p id="delete-rule-status" role="status"></p></dialog>
   <footer><span>AgentGate · Local prototype</span><span>Synthetic tools and data. No live company systems are connected.</span></footer>
 </main>
 </body>

@@ -18,6 +18,8 @@ function workspace(fetch) {
     setAttribute() {}
     removeAttribute() {}
     focus() { document.activeElement = this; }
+    showModal() { this.open = true; }
+    close() { this.open = false; }
     contains(node) { return this === node || this.children.some(child => child.contains(node)); }
     append(...nodes) { nodes.forEach(node => this.insertBefore(node, null)); }
     insertBefore(node, reference) {
@@ -72,6 +74,8 @@ test('late response cannot restore workspace data after disconnect', async () =>
   assert.equal(vm.runInContext('token', context), '');
   assert.equal(document.getElementById('total').textContent, '—');
   assert.equal(document.getElementById('last-updated').textContent, 'No data loaded yet');
+  assert.equal(document.getElementById('rules-agent').disabled, true);
+  assert.equal(document.getElementById('rules-agent').children[0].textContent, 'Connect to load agents');
 });
 
 test('unavailable server produces a useful message rather than a zero count', async () => {
@@ -187,4 +191,32 @@ test('theme remains usable without browser storage', () => {
   assert.equal(page.root.dataset.theme, 'dark');
   assert.equal(page.toggle.attributes['aria-pressed'], 'true');
   assert.deepEqual(page.writes, []);
+});
+
+test('rule editor converts dollars exactly and rejects invalid or excessive limits', () => {
+  const {context} = workspace();
+  for (const [dollars,cents] of [['0',0],['0.29',29],['100.01',10001],['10000.00',1000000]]) {
+    assert.equal(context.dollarsToCents(dollars),cents);
+  }
+  for (const value of ['', '-1', 'NaN', '1e3', '0.001', '10000.01', '99999']) {
+    assert.throws(()=>context.dollarsToCents(value));
+  }
+});
+
+test('deleting a rule re-enables Add and leaves an explicit default-deny empty state', async () => {
+  const remaining = {agent_id:'support-agent',revision:2,updated_at:'2026-11-10T00:00:00Z',rules:[],history:[],catalog:[{tool:'refunds.create',label:'Refunds',monetary:true,suggested_targets:['T-1001']}]};
+  const {context, document} = workspace(async()=>({ok:true,json:async()=>remaining}));
+  vm.runInContext(`token='example-reviewer-credential'; location.pathname='/rules'; rulesAgentId='support-agent';
+    rulesState={agent_id:'support-agent',revision:1,updated_at:'2026-11-10T00:00:00Z',rules:[{id:'r1',name:'Refunds',tool:'refunds.create',decision:'allow',scope:['T-1001'],approval_threshold_cents:10000}],history:[],catalog:[{tool:'refunds.create',label:'Refunds',monetary:true,suggested_targets:['T-1001']}]};`,context);
+  document.getElementById('rule-editor').hidden=true;
+  context.renderRules();
+  assert.equal(document.getElementById('add-rule').disabled,true);
+  const card=document.getElementById('rules-list').children[0];
+  const remove=card.querySelectorAll('button').find(button=>button.textContent==='Delete rule');
+  remove.listeners.click();
+  assert.equal(document.getElementById('delete-rule-dialog').open,true);
+  await document.getElementById('confirm-rule-delete').listeners.click();
+  assert.equal(document.getElementById('delete-rule-dialog').open,false);
+  assert.equal(document.getElementById('add-rule').disabled,false);
+  assert.match(document.getElementById('rules-list').children[0].textContent,/All tool requests.*blocked/);
 });

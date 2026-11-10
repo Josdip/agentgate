@@ -335,3 +335,18 @@ footer { display: flex; justify-content: space-between; gap: 20px; border-top: 1
 @media (max-width: 440px) {
   .header-tools { width: 100%; justify-content: space-between; margin-left: 0; }
 }
+.rules-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.rules-toolbar .field-inline { flex: 1; }
+.rules-guards { padding: 20px 24px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin: 24px 0; }
+.rules-guards h2 { font-size: 17px; }
+.rules-guards p { color: var(--muted); margin: 0; max-width: 85ch; font-size: 14px; }
+#rule-form { display: grid; gap: 12px; max-width: 760px; }
+#rule-form > div > label { display: block; margin-bottom: 8px; }
+#rule-scope { width: 100%; }
+#rule-form .help { margin-top: 8px; }
+#rule-editor { margin-bottom: 24px; }
+dialog { color: var(--ink); background: var(--surface); border: 1px solid var(--field-border); border-radius: 12px; padding: 28px; max-width: min(540px,calc(100% - 32px)); }
+dialog::backdrop { background: rgb(8 18 32 / .65); }
+dialog p { max-width: 65ch; color: var(--muted); }
+#rule-form-status, #delete-rule-status { font-size: 14px; color: var(--reject-text); }
+@media(max-width:600px) { nav { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); } nav a { min-height: 44px; text-align: center; padding-block: 10px; } .rules-toolbar { align-items: stretch; flex-direction: column; gap: 0; } .rules-toolbar button { align-self: start; } }
