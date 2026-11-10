@@ -66,3 +66,7 @@ Validation: 80 Python tests and 11 interface tests pass. Browser checks confirme
 ## Approved earlier interface/theme merges
 
 At the owner's explicit request, merged PR #1 (readable interface) and PR #2 (theme toggle) to main, preserving their commits. The in-progress Rules work remained separate on `codex/agent-rules`, and was fast-forwarded over main's identical baseline tree without discarding edits. No deployment was performed.
+
+## Security & compliance assessment page
+
+Added per-agent curated checks for configured monetary autonomy, cumulative-budget gaps, blocked/pending actions and missing live-model/dependency evidence. Added reviewer-owned, revision-protected regulatory applicability declarations with persistent history. Guidance links, scoped evidence and suggested verification support the demo without claiming certification or confirmed compromise. See security-compliance.md for scope and the demo tour.

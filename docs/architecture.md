@@ -90,3 +90,7 @@ See [the live demo/profile guide](live-demo-and-profile.md) for the new reviewer
 The latest contract is in [navigation and multi-agent demos](navigation-and-agents.md). `registry.py` owns Support/Sales/Finance identities and scopes. Agent credentials map to one server-selected identity before `Store.submit` evaluates its permissions. Reviewer demo endpoints use the server catalog's identity. Tools remain synthetic. Existing profile endpoints are compatibility aliases; new endpoints scope profile edits and history per agent.
 
 `/api/overview` aggregates all actions and returns three recent rows. `/api/activity` applies SQL filters and bounded descending row-ID cursor pagination; the browser never loads the complete audit trail. Indexes are created on agent, outcome, and risk. Search and total counts are not yet optimized for large production datasets. Separate URL-backed client views retain credentials only in memory across navigation.
+
+## Security and compliance assessments
+
+See [the assessment guide](security-compliance.md) for reviewer-only APIs, versioned applicability declarations, deterministic checks, evidence limits and verification. Findings use a consistent SQLite snapshot; they do not change permissions or assert legal compliance, CVE exposure or compromise. Local demo access remains privileged and synthetic.

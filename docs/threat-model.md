@@ -55,3 +55,7 @@ Sales, Finance, and Support have separate server-owned permission scopes. Option
 The privileged reviewer can now change active tool permissions through strict structured schemas. These changes are separate from profile metadata. Agents cannot read or mutate policy endpoints, use rule bodies to choose identity, disable schema validation, register executable tools, or approve themselves. Exact targets, finite schemas, and one rule per tool keep decisions deterministic; deletion fails closed and is not undone by restart.
 
 Every rule change records a revision snapshot, and actions record the evaluation revision/rule ID. Rule writes, submissions, and approvals serialize through SQLite write transactions. Approval fails when that agent's policy revision changed or when legacy provenance is unknown; rejection and resubmission are required. The reviewer role is trusted to expand access intentionally. Production separation of policy administrators/reviewers, individual identities, protected audit storage, and real-side-effect recovery remain future work. See the concrete bypass and concurrency cases in `tests/test_rules.py`.
+
+## Security and compliance assessments
+
+See [the assessment guide](security-compliance.md) for reviewer-only APIs, versioned applicability declarations, deterministic checks, evidence limits and verification. Findings use a consistent SQLite snapshot; they do not change permissions or assert legal compliance, CVE exposure or compromise. Local demo access remains privileged and synthetic.

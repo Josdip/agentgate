@@ -20,6 +20,7 @@ from .policy import (
 from .profile import ProfileUpdate
 from .registry import AGENTS
 from .rules import RuleChange
+from .security import CATALOG_VERSION, FRAMEWORKS, ApplicabilityUpdate, assess
 
 
 class Store:
@@ -42,6 +43,14 @@ class Store:
                 PRIMARY KEY (agent_id, revision))""")
             for column in ("agent_id", "outcome", "risk"):
                 db.execute(f"CREATE INDEX IF NOT EXISTS actions_{column} ON actions({column})")
+            db.execute("""CREATE TABLE IF NOT EXISTS compliance_scope (
+                agent_id TEXT NOT NULL, framework TEXT NOT NULL, revision INTEGER NOT NULL,
+                applicability TEXT NOT NULL, rationale TEXT NOT NULL, updated_at TEXT NOT NULL,
+                PRIMARY KEY(agent_id, framework))""")
+            db.execute("""CREATE TABLE IF NOT EXISTS compliance_scope_history (
+                agent_id TEXT NOT NULL, framework TEXT NOT NULL, revision INTEGER NOT NULL,
+                applicability TEXT NOT NULL, rationale TEXT NOT NULL, changed_at TEXT NOT NULL,
+                changed_by TEXT NOT NULL, PRIMARY KEY(agent_id, framework, revision))""")
             now = datetime.now(UTC).isoformat()
             for agent_id, config in AGENTS.items():
                 metadata = json.dumps(
@@ -377,6 +386,117 @@ class Store:
                 "total": total,
                 "next_cursor": items[-1]["cursor"] if has_more else None,
             }
+
+    def security(self, agent_id):
+        if agent_id not in AGENTS:
+            raise KeyError("Agent not found")
+        with self.connection() as db:
+            db.execute("BEGIN")
+            policy = self._policy(db, agent_id)
+            profile = db.execute(
+                "SELECT * FROM agent_profiles WHERE agent_id=?", (agent_id,)
+            ).fetchone()
+            activity = dict(
+                db.execute(
+                    """SELECT COUNT(*) AS total,
+                COALESCE(SUM(outcome='denied'),0) AS denied,
+                COALESCE(SUM(outcome='pending'),0) AS pending,
+                COALESCE(SUM(outcome='executed'),0) AS executed
+                FROM actions WHERE agent_id=?""",
+                    (agent_id,),
+                ).fetchone()
+            )
+            latest = [
+                dict(row)
+                for row in db.execute(
+                    """SELECT id,run_id,created_at,tool,outcome,
+                rule,policy_revision FROM actions WHERE agent_id=? ORDER BY rowid DESC LIMIT 5""",
+                    (agent_id,),
+                )
+            ]
+            frameworks = []
+            for key, spec in FRAMEWORKS.items():
+                scope = db.execute(
+                    "SELECT * FROM compliance_scope WHERE agent_id=? AND framework=?",
+                    (agent_id, key),
+                ).fetchone()
+                declaration = (
+                    dict(scope)
+                    if scope
+                    else {
+                        "revision": 0,
+                        "applicability": "unknown",
+                        "rationale": "",
+                        "updated_at": None,
+                    }
+                )
+                frameworks.append(
+                    dict(
+                        id=key,
+                        **spec,
+                        **declaration,
+                        compliance_status="Not assessed",
+                        control_review=(
+                            "Review the supporting controls and unresolved evidence before making a compliance decision."
+                            if declaration["applicability"] == "applies"
+                            else "Confirm scope first. No compliance conclusion has been made."
+                        ),
+                        supporting_controls=(
+                            [
+                                "Exact resource boundaries",
+                                "Activity records",
+                                "Organisation-wide safeguards",
+                            ]
+                            if key != "eu-ai-act"
+                            else [
+                                "Human oversight configuration",
+                                "Activity records",
+                                "Use-case and role classification",
+                            ]
+                        ),
+                        provenance="Reviewer declaration; not independently verified",
+                    )
+                )
+            return dict(
+                agent_id=agent_id,
+                display_name=json.loads(profile["metadata"])["display_name"],
+                owner=AGENTS[agent_id]["owner"],
+                policy_revision=policy["revision"],
+                profile_revision=profile["revision"],
+                catalog_version=CATALOG_VERSION,
+                evaluated_at=datetime.now(UTC).isoformat(),
+                frameworks=frameworks,
+                **assess(policy, json.loads(profile["metadata"]), activity, latest),
+            )
+
+    def update_compliance_scope(self, agent_id, framework, update: ApplicabilityUpdate):
+        if agent_id not in AGENTS or framework not in FRAMEWORKS:
+            raise KeyError("Agent or framework not found")
+        if not update.rationale.strip() or len(update.rationale.strip()) < 10:
+            raise ValueError("Explain the applicability decision in at least 10 characters")
+        with self.connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT revision FROM compliance_scope WHERE agent_id=? AND framework=?",
+                (agent_id, framework),
+            ).fetchone()
+            if update.revision != (row["revision"] if row else 0):
+                raise ValueError("Applicability changed; refresh before saving again")
+            now = datetime.now(UTC).isoformat()
+            values = (
+                agent_id,
+                framework,
+                update.revision + 1,
+                update.applicability,
+                update.rationale.strip(),
+                now,
+            )
+            db.execute("INSERT OR REPLACE INTO compliance_scope VALUES (?,?,?,?,?,?)", values)
+            db.execute(
+                "INSERT INTO compliance_scope_history VALUES (?,?,?,?,?,?,?)",
+                (*values, "local-reviewer"),
+            )
+        return self.security(agent_id)
 
     def review(self, action_id: str, approve: bool):
         with self.connection() as db:

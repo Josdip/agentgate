@@ -20,6 +20,7 @@ from .profile import ProfileUpdate
 from .registry import AGENTS
 from .rules import RuleChange
 from .scenarios import scenario, scenarios
+from .security import ApplicabilityUpdate
 from .store import Store
 
 bearer = HTTPBearer(auto_error=False)
@@ -199,6 +200,22 @@ def create_app(
             agent_id=agent_id, outcome=outcome, risk=risk, search=search, before=before, limit=limit
         )
 
+    @app.get("/api/agents/{agent_id}/security", dependencies=[reviewer_auth])
+    def security_assessment(agent_id: str):
+        try:
+            return store.security(agent_id)
+        except KeyError:
+            raise HTTPException(404, "Agent not found") from None
+
+    @app.put("/api/agents/{agent_id}/compliance/{framework}", dependencies=[reviewer_auth])
+    def compliance_scope(agent_id: str, framework: str, update: ApplicabilityUpdate):
+        try:
+            return store.update_compliance_scope(agent_id, framework, update)
+        except KeyError:
+            raise HTTPException(404, "Agent or framework not found") from None
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+
     @app.get("/api/agents", dependencies=[reviewer_auth])
     def directory():
         return store.directory()
@@ -288,6 +305,7 @@ def create_app(
 
     @app.get("/agents", include_in_schema=False)
     @app.get("/agents/{agent_id}", include_in_schema=False)
+    @app.get("/security", include_in_schema=False)
     @app.get("/rules", include_in_schema=False)
     @app.get("/activity", include_in_schema=False)
     @app.get("/", include_in_schema=False)

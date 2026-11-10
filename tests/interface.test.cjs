@@ -260,3 +260,45 @@ test('failed demo bootstrap offers retry and never invents loaded totals', async
   assert.match(document.getElementById('status').textContent,/localhost/);
   assert.notEqual(document.getElementById('total').textContent,'0');
 });
+
+test('security polling preserves unsaved applicability text and expanded fixes', () => {
+  const {context,document} = workspace(async()=>{});
+  const framework={id:'gdpr',name:'GDPR',focus:'Privacy',scope:'Review scope',compliance_status:'Not assessed',applicability:'unknown',provenance:'Declared',rationale:'',revision:0,next_steps:'Review data',reference:'Article 32',source:'https://eur-lex.europa.eu/',control_review:'Needs evidence',supporting_controls:['Audit']};
+  const report={display_name:'Support',owner:'Support',policy_revision:1,catalog_version:'test',evaluated_at:'2026-11-10T00:00:00Z',findings:[],frameworks:[framework],controls:[],activity:{denied:0,pending:0}};
+  context.report=report;
+  vm.runInContext('securityState=report;renderSecurity()',context);
+  const container=document.getElementById('security-frameworks');
+  const card=container.children[0];const textarea=card.querySelector('textarea');textarea.value='Draft scope explanation';
+  const details=card.querySelector('details');details.open=true;
+  vm.runInContext('securityState={...report,evaluated_at:"2026-11-10T00:00:03Z"};renderSecurity()',context);
+  assert.equal(container.children[0],card);assert.equal(textarea.value,'Draft scope explanation');assert.equal(details.open,true);
+  vm.runInContext('securityState={...report,frameworks:[{...report.frameworks[0],revision:2,rationale:"Another reviewer changed scope"}]};renderSecurity()',context);
+  assert.equal(container.children[0],card);assert.equal(textarea.value,'Draft scope explanation');
+  vm.runInContext("securityAgentId='sales-agent';renderSecurity()",context);
+  assert.notEqual(container.children[0],card);assert.equal(container.children[0].querySelector('textarea').value,'Another reviewer changed scope');
+});
+
+test('disconnect removes rendered security evidence and applicability forms', () => {
+  const {context,document}=workspace(async()=>{});
+  document.getElementById('security-findings').append(document.createElement('article'));
+  document.getElementById('security-frameworks').append(document.createElement('form'));
+  document.getElementById('disconnect').listeners.click();
+  assert.equal(document.getElementById('security-findings').children.length,0);
+  assert.equal(document.getElementById('security-frameworks').children.length,0);
+  assert.equal(document.getElementById('security-content').hidden,true);
+  assert.equal(vm.runInContext('securityState',context),null);
+});
+
+test('saving applicability replaces the saved form with the new revision', async()=>{
+  let payload;
+  const framework={id:'gdpr',name:'GDPR',focus:'Privacy',scope:'Scope',compliance_status:'Not assessed',applicability:'unknown',provenance:'Declared',rationale:'',revision:0,next_steps:'Review',reference:'Article 32',source:'https://eur-lex.europa.eu/',control_review:'Needs evidence',supporting_controls:[]};
+  const report={display_name:'Support',owner:'Support',policy_revision:1,catalog_version:'test',evaluated_at:'2026-11-10T00:00:00Z',findings:[],frameworks:[framework],controls:[],activity:{denied:0,pending:0}};
+  const {context,document}=workspace(async(path,options)=>{payload=JSON.parse(options.body);return {ok:true,json:async()=>({...report,frameworks:[{...framework,...payload,revision:1}]})};});
+  context.report=report;vm.runInContext("token='example-reviewer';securityState=report;renderSecurity()",context);
+  const container=document.getElementById('security-frameworks');const card=container.children[0];
+  card.querySelector('textarea').value='EU data in this demo workflow';card.querySelector('select').value='applies';
+  await card.querySelector('form').listeners.submit({preventDefault(){}});
+  assert.equal(payload.revision,0);assert.notEqual(container.children[0],card);
+  assert.equal(container.children[0].dataset.scopeRevision,'1');
+  assert.equal(container.children[0].querySelector('select').value,'applies');
+});
