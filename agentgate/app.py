@@ -17,6 +17,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .policy import StrictModel, ToolCall
 from .profile import ProfileUpdate
 from .registry import AGENTS
+from .rules import RuleChange
 from .scenarios import scenario, scenarios
 from .store import Store
 
@@ -163,6 +164,33 @@ def create_app(db_path=None, agent_token=None, reviewer_token=None, agent_tokens
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from None
 
+    @app.get("/api/agents/{agent_id}/rules", dependencies=[reviewer_auth])
+    def get_rules(agent_id: str):
+        try:
+            return store.rules(agent_id)
+        except KeyError:
+            raise HTTPException(404, "Agent not found") from None
+
+    def mutate_rules(agent_id, change=None, rule_id=None, revision=None):
+        try:
+            return store.change_rule(agent_id, change, rule_id=rule_id, revision=revision)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @app.post("/api/agents/{agent_id}/rules", dependencies=[reviewer_auth], status_code=201)
+    def add_rule(agent_id: str, change: RuleChange):
+        return mutate_rules(agent_id, change)
+
+    @app.put("/api/agents/{agent_id}/rules/{rule_id}", dependencies=[reviewer_auth])
+    def edit_rule(agent_id: str, rule_id: str, change: RuleChange):
+        return mutate_rules(agent_id, change, rule_id)
+
+    @app.delete("/api/agents/{agent_id}/rules/{rule_id}", dependencies=[reviewer_auth])
+    def delete_rule(agent_id: str, rule_id: str, revision: int = Query(ge=1)):
+        return mutate_rules(agent_id, rule_id=rule_id, revision=revision)
+
     @app.get("/api/agent", dependencies=[reviewer_auth])
     def agent_profile():
         return store.profile()
@@ -205,6 +233,7 @@ def create_app(db_path=None, agent_token=None, reviewer_token=None, agent_tokens
 
     @app.get("/agents", include_in_schema=False)
     @app.get("/agents/{agent_id}", include_in_schema=False)
+    @app.get("/rules", include_in_schema=False)
     @app.get("/activity", include_in_schema=False)
     @app.get("/", include_in_schema=False)
     def index():

@@ -118,7 +118,7 @@ def test_cursor_pagination_is_bounded_and_stable_with_new_arrivals(tmp_path):
     )
     with store.connection() as db:
         db.execute(
-            """INSERT INTO actions SELECT 'seed-'||value,created_at,agent_id,'seed-'||value,
+            """INSERT INTO actions (id,created_at,agent_id,run_id,tool,arguments,outcome,rule,reason,risk,result,reviewed_at,reviewer_id) SELECT 'seed-'||value,created_at,agent_id,'seed-'||value,
             tool,arguments,outcome,rule,reason,risk,result,reviewed_at,reviewer_id
             FROM actions CROSS JOIN json_each(?)""",
             (json.dumps(list(range(1000))),),
