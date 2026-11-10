@@ -23,47 +23,72 @@ async function api(path, options = {}) {
   }
   return response.json();
 }
-function render() {
-  for (const key of ['denied', 'pending', 'executed']) {
-    $(key).textContent = actions.filter((a) => a.outcome === key).length;
-  }
-  $('total').textContent = actions.length;
-  const container = $('actions');
-  container.replaceChildren();
-  const filtered = actions.filter((a) => $('filter').value === 'all' || a.outcome === $('filter').value);
-  if (!filtered.length) container.append(element('div', 'No activity matches this view. Run the demo or change the filter.', 'empty'));
-  for (const action of filtered) {
-    const card = element('article', undefined, 'action');
-    const head = element('div', undefined, 'action-head');
-    head.append(element('strong', action.tool), element('span', action.outcome, `badge ${action.outcome}`),
-      element('span', new Date(action.created_at).toLocaleString(), 'meta'));
-    card.append(head, element('p', action.reason, 'reason'),
-      element('div', `${action.rule} · ${action.risk} risk · run ${action.run_id}`, 'rule'));
-    const details = element('details');
-    details.append(element('summary', 'Inspect request & result'), element('pre', JSON.stringify({
-      id: action.id, agent: action.agent_id, arguments: action.arguments, result: action.result,
-      reviewer: action.reviewer_id, reviewed_at: action.reviewed_at
-    }, null, 2)));
-    card.append(details);
-    if (action.outcome === 'pending') {
-      const buttons = element('div', undefined, 'review');
-      for (const approve of [true, false]) {
-        const button = element('button', approve ? 'Approve simulated refund' : 'Reject', approve ? '' : 'reject');
-        button.addEventListener('click', async () => {
-          buttons.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-          try {
-            await api(`/api/actions/${encodeURIComponent(action.id)}/review`, {
-              method: 'POST', body: JSON.stringify({approve})
-            });
-            await load();
-            status(approve ? 'Refund approved and simulated execution recorded.' : 'Action rejected.');
-          } catch (error) { status(error.message); buttons.querySelectorAll('button').forEach((b) => { b.disabled = false; }); }
-        });
-        buttons.append(button);
-      }
-      card.append(buttons);
+let agents = [];
+let before = null;
+let cursorStack = [];
+let nextCursor = null;
+let activeProfileId = null;
+let summary = null;
+let routeVersion = 0;
+let requestedAgentFilter = null;
+const agentName = (id) => agents.find(a => a.agent_id === id)?.display_name || id;
+const money = (cents) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents / 100);
+function actionTitle(action) {
+  const args = action.arguments;
+  const names = {'documents.read':`Requested document “${args.document_id}”`, 'refunds.create':`Requested a ${money(args.amount_cents || 0)} customer refund`, 'messages.send':`Requested a message to ${args.destination}`, 'crm.read':`Requested sales lead ${args.lead_id}`, 'invoices.read':`Requested invoice ${args.invoice_id}`, 'payments.create':`Requested a ${money(args.amount_cents || 0)} supplier payment`};
+  return names[action.tool] || `Attempted an unregistered tool (${action.tool})`;
+}
+function actionCard(action, compact = false) {
+  const card = element('article', undefined, 'action');
+  const head = element('div', undefined, 'action-head');
+  head.append(element('strong', actionTitle(action)), element('span', action.outcome === 'denied' ? 'Blocked' : action.outcome, `badge ${action.outcome}`));
+  card.append(head, element('p', `${agentName(action.agent_id)} · ${new Date(action.created_at).toLocaleString()} · ${action.risk} action risk`, 'rule'));
+  if (compact) return card;
+  card.append(element('p', action.reason, 'reason'));
+  const details = element('details');
+  details.append(element('summary','Inspect technical evidence'),element('pre',JSON.stringify(action,null,2)));
+  card.append(details);
+  if (action.outcome === 'pending') {
+    const buttons = element('div',undefined,'review');
+    for (const approve of [true,false]) {
+      const button = element('button',approve ? 'Approve simulated action' : 'Reject',approve ? '' : 'reject');
+      button.addEventListener('click',async () => {
+        buttons.querySelectorAll('button').forEach(b=>{b.disabled=true;});
+        try {
+          const updated = await api(`/api/actions/${encodeURIComponent(action.id)}/review`,{method:'POST',body:JSON.stringify({approve})});
+          for (const result of demoResults.values()) if (result.action.id === updated.id) result.action = updated;
+          await load(); status(approve ? 'Approved. Simulated execution recorded.' : 'Action rejected.');
+        } catch (error) { status(error.message); buttons.querySelectorAll('button').forEach(b=>{b.disabled=false;}); }
+      });
+      buttons.append(button);
     }
-    container.append(card);
+    card.append(buttons);
+  }
+  return card;
+}
+function render() {
+  const container = $('actions'); container.replaceChildren();
+  if (!actions.length) container.append(element('div','No actions match these filters.','empty'));
+  actions.forEach(action=>container.append(actionCard(action)));
+}
+function renderOverview() {
+  for (const key of ['total','denied','pending','executed']) $(key).textContent = summary[key];
+  $('known-agents').textContent = `${summary.agents} registered demo agents · View inventory →`;
+  $('recent-actions').className = '';
+  $('recent-actions').replaceChildren();
+  if (!summary.recent.length) $('recent-actions').append(element('div','Run a case to see recent activity.','empty'));
+  summary.recent.forEach(action=>$('recent-actions').append(actionCard(action,true)));
+}
+function renderDirectory() {
+  const query = $('directory-search').value.toLowerCase();
+  const matches = agents.filter(a=>`${a.display_name} ${a.owner} ${a.location}`.toLowerCase().includes(query));
+  $('agent-count').textContent = `${matches.length} of ${agents.length} registered demo agents`;
+  $('agent-directory').replaceChildren();
+  for (const agent of matches) {
+    const card = element('article',undefined,'agent-tile');
+    card.append(element('div',`${agent.owner} · ${agent.location} (simulated)`,'eyebrow'),element('h2',agent.display_name),element('p',agent.description,'help'),element('p',`${agent.tools.length} tools · ${agent.activity.total_actions} actions · ${agent.activity.pending} awaiting approval`,'rule'));
+    const link=element('a','View agent profile →');link.href=`/agents/${agent.agent_id}`;link.dataset.nav='';card.append(link);
+    $('agent-directory').append(card);
   }
 }
 
@@ -101,11 +126,12 @@ function fillEditor() {
   editorReady = true;
 }
 function renderProfile() {
+  $('profile-panel').hidden = false;
   const container = $('profile-summary');
   container.className = '';
   container.replaceChildren();
   container.append(element('h3', profile.display_name), element('p', profile.description, 'help'),
-    element('p', `${profile.agent_id} · revision ${profile.revision} · synthetic execution`, 'rule'));
+    element('p', `${profile.agent_id} · ${profile.owner} · ${profile.location} (simulated) · revision ${profile.revision}`, 'rule'));
   const facts = element('div', undefined, 'profile-facts');
   const a = profile.activity;
   facts.append(element('p', `${a.total_actions} lifetime actions · ${a.denied} blocked · ${a.pending} pending`),
@@ -138,7 +164,7 @@ function renderProfile() {
 function renderScenarios() {
   const container = $('scenarios');
   container.replaceChildren();
-  scenarioItems.forEach((item, index) => {
+  scenarioItems.filter(item => item.agent_id === $('demo-agent').value).forEach((item, index) => {
     const card = element('article', undefined, 'scenario');
     card.append(element('div', `CASE ${String(index + 1).padStart(2, '0')} · EXPECT ${item.expected.toUpperCase()}`, 'eyebrow'),
       element('h3', item.name), element('p', item.description, 'help'));
@@ -172,69 +198,109 @@ function renderScenarios() {
       const details = element('details');
       details.append(element('summary', 'View recorded result'), element('pre', JSON.stringify(current, null, 2)));
       output.append(details);
-      if (current.outcome === 'pending') output.append(element('p', 'Awaiting your decision in Activity & decisions below.', 'help'));
+      if (current.outcome === 'pending') { const reviewLink = element('a','Review this request →'); reviewLink.href=`/activity?outcome=pending&agent_id=${item.agent_id}`; reviewLink.dataset.nav=''; output.append(reviewLink); }
       card.append(output);
     }
     container.append(card);
   });
 }
+function activityQuery() {
+  const query = new URLSearchParams({limit:'20'});
+  for (const [id,key] of [['activity-agent','agent_id'],['filter','outcome'],['risk-filter','risk'],['activity-search','search']]) if ($(id).value) query.set(key,$(id).value);
+  if (before) query.set('before',before);
+  return query;
+}
 async function load(quiet = false) {
-  if (!token) { if (!quiet) status('Enter a reviewer token to connect.'); return; }
+  if (!token) { if (!quiet) status('Connect with your reviewer token to load data.'); return; }
   if (loading) return;
   loading = true;
-  $('refresh').disabled = true;
+  const version = routeVersion;
   try {
-    const [newActions, newProfile] = await Promise.all([api('/api/actions'), api('/api/agent')]);
-    const actionsChanged = JSON.stringify(actions) !== JSON.stringify(newActions);
-    const profileChanged = JSON.stringify(profile) !== JSON.stringify(newProfile);
-    const firstLoad = !scenarioItems.length;
-    actions = newActions; profile = newProfile;
-    if (firstLoad) scenarioItems = await api('/api/demo/scenarios');
-    if (actionsChanged || firstLoad) { render(); renderScenarios(); }
-    if (profileChanged || !editorReady) renderProfile();
-    $('disconnect').hidden = false;
-    $('live-state').textContent = 'LIVE · UPDATES EVERY 3 SECONDS';
-    if (!quiet) status('Connected. Run a scenario below; activity updates automatically.');
-  } catch (error) { status(error.message); $('live-state').textContent = 'CONNECTION ERROR'; }
-  finally { loading = false; $('refresh').disabled = false; }
+    const directory = await api('/api/agents');
+    if (version !== routeVersion) return;
+    const directoryChanged = JSON.stringify(agents) !== JSON.stringify(directory);
+    agents = directory;
+    if (directoryChanged) {
+      renderDirectory();
+      const selected = $('activity-agent').value;
+      $('activity-agent').replaceChildren(new Option('All agents',''));
+      agents.forEach(a=>$('activity-agent').append(new Option(a.display_name,a.agent_id)));
+      $('activity-agent').value=requestedAgentFilter ?? selected; requestedAgentFilter=null;
+    }
+    if (location.pathname === '/') {
+      const next = await api('/api/overview');
+      if (version !== routeVersion) return;
+      if (JSON.stringify(summary)!==JSON.stringify(next)) {summary=next;renderOverview();}
+      if (!scenarioItems.length) {scenarioItems=await api('/api/demo/scenarios');renderScenarios();}
+    } else if (location.pathname === '/activity') {
+      const page = await api(`/api/activity?${activityQuery()}`);
+      if (version !== routeVersion) return;
+      if (JSON.stringify(actions)!==JSON.stringify(page.items)) {actions=page.items;render();}
+      else if (!actions.length) render();
+      nextCursor=page.next_cursor;
+      $('activity-count').textContent=`${page.total} matching actions · showing ${page.items.length} · ${before ? 'older results (auto-refresh paused)' : 'newest first'}`;
+      $('older').disabled=!nextCursor;$('newer').disabled=!cursorStack.length;
+      $('page-label').textContent=`20 per page · page ${cursorStack.length+1}`;
+    } else if (activeProfileId) {
+      const next=agents.find(a=>a.agent_id===activeProfileId);
+      if (!next) {status('Agent not found.');$('profile-panel').hidden=true;return;}
+      if (JSON.stringify(profile)!==JSON.stringify(next) || !editorReady) {profile=next;renderProfile();}
+    }
+    $('disconnect').hidden=false;
+    $('live-state').textContent='LIVE · UPDATES EVERY 3 SECONDS';
+    if (!quiet) status('Connected. Activity updates automatically; your token stays in memory.');
+  } catch (error) {status(error.message);}
+  finally {loading=false;}
 }
-$('connect').addEventListener('click', () => {
-  token = $('token').value; $('token').value = ''; editorReady = false;
+function route() {
+  routeVersion++;
+  const path=location.pathname;
+  $('home-page').hidden=path!=='/';$('agents-page').hidden=!path.startsWith('/agents');$('activity-page').hidden=path!=='/activity';
+  activeProfileId=path.startsWith('/agents/') ? decodeURIComponent(path.split('/')[2]) : null;
+  $('profile-panel').hidden=!activeProfileId;
+  profile=null;editorReady=false;before=null;cursorStack=[];actions=[];
+  const query=new URLSearchParams(location.search);
+  requestedAgentFilter=query.get('agent_id');
+  for (const [id,key] of [['activity-agent','agent_id'],['filter','outcome'],['risk-filter','risk'],['activity-search','search']]) $(id).value=query.get(key)||'';
+  document.querySelectorAll('nav a').forEach(link=>{link.classList.toggle('active',link.pathname==='/' ? path==='/' : path.startsWith(link.pathname));});
+  if (path === '/' && scenarioItems.length) renderScenarios();
   load();
+}
+document.addEventListener('click',event=>{
+  const link=event.target.closest('a[data-nav]');
+  if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.button!==0) return;
+  event.preventDefault();history.pushState({},'',link.href);route();window.scrollTo(0,0);
 });
-$('token').addEventListener('keydown', (event) => { if (event.key === 'Enter') $('connect').click(); });
-$('disconnect').addEventListener('click', () => {
-  token = ''; actions = []; profile = null; scenarioItems = []; editorReady = false;
-  demoResults.clear(); render();
-  $('scenarios').replaceChildren(element('div', 'Connect to run demo scenarios.', 'empty'));
-  $('profile-summary').replaceChildren(element('p', 'Connect to load the agent profile.'));
-  $('model-rows').replaceChildren(); $('agent-name').value = ''; $('agent-description').value = '';
-  $('history-list').replaceChildren(); $('profile-status').textContent = '';
-  $('profile-editor').hidden = true; $('profile-history').hidden = true;
-  $('disconnect').hidden = true; $('live-state').textContent = 'CONNECT TO BEGIN';
-  status('Disconnected. Token removed from memory.');
+window.addEventListener('popstate',route);
+$('connect').addEventListener('click',()=>{token=$('token').value;$('token').value='';editorReady=false;load();});
+$('token').addEventListener('keydown',event=>{if(event.key==='Enter')$('connect').click();});
+$('disconnect').addEventListener('click',()=>{
+  token='';actions=[];agents=[];profile=null;summary=null;scenarioItems=[];demoResults.clear();editorReady=false;
+  $('disconnect').hidden=true;
+  $('scenarios').replaceChildren(element('div','Connect to run demo cases.','empty'));
+  $('agent-directory').replaceChildren();$('actions').replaceChildren();$('recent-actions').replaceChildren();
+  $('profile-panel').hidden=true;$('profile-summary').replaceChildren();$('model-rows').replaceChildren();$('history-list').replaceChildren();
+  $('agent-name').value='';$('agent-description').value='';$('profile-status').textContent='';
+  for(const id of ['total','denied','pending','executed'])$(id).textContent='—';
+  $('activity-count').textContent='Connect to view activity.';$('agent-count').textContent='';
+  $('live-state').textContent='CONNECT TO BEGIN';status('Disconnected. Token removed from memory.');
 });
-$('add-model').addEventListener('click', () => {
-  if ($('model-rows').children.length >= 10) { $('profile-status').textContent = 'Maximum 10 model connections.'; return; }
-  modelRow();
-});
-$('profile-form').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  $('save-profile').disabled = true;
+$('add-model').addEventListener('click',()=>{if($('model-rows').children.length<10)modelRow();});
+$('profile-form').addEventListener('submit',async event=>{
+  event.preventDefault();$('save-profile').disabled=true;
   try {
-    const model_connections = [...$('model-rows').children].map((row) => ({
-      provider:row.querySelector('[data-field="provider"]').value.trim(),
-      model:row.querySelector('[data-field="model"]').value.trim()
-    }));
-    profile = await api('/api/agent', {method:'PUT', body:JSON.stringify({
-      revision:Number($('profile-form').dataset.revision), display_name:$('agent-name').value.trim(),
-      description:$('agent-description').value, model_connections
-    })});
-    fillEditor(); renderProfile();
-    $('profile-status').textContent = 'Profile saved. Model entries are unverified inventory.';
-  } catch (error) { $('profile-status').textContent = error.message; }
-  finally { $('save-profile').disabled = false; }
+    const model_connections=[...$('model-rows').children].map(row=>({provider:row.querySelector('[data-field="provider"]').value.trim(),model:row.querySelector('[data-field="model"]').value.trim()}));
+    profile=await api(`/api/agents/${activeProfileId}`,{method:'PUT',body:JSON.stringify({revision:Number($('profile-form').dataset.revision),display_name:$('agent-name').value.trim(),description:$('agent-description').value,model_connections})});
+    fillEditor();renderProfile();$('profile-status').textContent='Saved a new profile revision. Model inventory remains unverified.';
+    await load(true);
+  } catch(error){$('profile-status').textContent=error.message;}
+  finally{$('save-profile').disabled=false;}
 });
-$('refresh').addEventListener('click', () => load());
-$('filter').addEventListener('change', render);
-setInterval(() => { if (token && !document.hidden) load(true); }, 3000);
+$('demo-agent').addEventListener('change',renderScenarios);
+$('directory-search').addEventListener('input',renderDirectory);
+$('activity-filters').addEventListener('submit',event=>{event.preventDefault();before=null;cursorStack=[];actions=[];load();});
+$('older').addEventListener('click',()=>{cursorStack.push(before);before=nextCursor;load();});
+$('newer').addEventListener('click',()=>{before=cursorStack.pop();load();});
+$('refresh').addEventListener('click',()=>load());
+setInterval(()=>{if(token&&!document.hidden&&!(location.pathname==='/activity'&&before))load(true);},3000);
+route();
