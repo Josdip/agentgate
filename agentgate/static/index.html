@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AgentGate · Agent oversight</title><link rel="stylesheet" href="/static/styles.css"><script src="/static/app.js" defer></script></head>
+<body>
+<header><a class="brand" href="/">◈ AgentGate</a><span class="environment">LOCAL DEMO · SYNTHETIC DATA</span></header>
+<main>
+<section class="intro"><div class="eyebrow">AGENT SECURITY & GOVERNANCE</div><h1>Know what your agents do.<br><span>Control what happens next.</span></h1><p>Inspect tool activity, understand policy decisions, and review sensitive actions in one place.</p></section>
+<section class="connection" aria-label="Reviewer connection"><label for="token">Reviewer access token</label><div class="connect-row"><input id="token" type="password" autocomplete="off" placeholder="Enter your local reviewer token"><button id="connect">Connect</button><button id="disconnect" class="secondary" hidden>Disconnect</button></div><p id="status" role="status">Connect to load activity. Your token stays in this tab’s memory.</p></section>
+<section class="metrics" aria-label="Activity summary"><article><span>RECENT ACTIONS</span><strong id="total">—</strong></article><article><span>BLOCKED BY POLICY</span><strong id="denied">—</strong></article><article><span>AWAITING REVIEW</span><strong id="pending">—</strong></article><article><span>EXECUTED</span><strong id="executed">—</strong></article></section>
+<section class="activity"><div class="section-heading"><div><h2>Activity & decisions</h2><p>Latest 200 actions · support-agent</p></div><div class="controls"><label for="filter">Show</label><select id="filter"><option value="all">All decisions</option><option value="pending">Awaiting review</option><option value="denied">Blocked</option><option value="executed">Executed</option><option value="rejected">Rejected</option></select><button id="refresh" class="secondary">Refresh</button></div></div><div id="actions"><div class="empty">Connect your reviewer account to inspect agent activity.</div></div></section>
+<footer>AgentGate v0.1 · Rule-based enforcement · All tool effects are simulated</footer>
+</main></body></html>
