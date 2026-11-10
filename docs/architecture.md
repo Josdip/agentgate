@@ -74,3 +74,9 @@ Authentication failures return 401, missing review targets 404, replayed decisio
 ## Privacy
 
 No raw prompts or model conversations are collected. Message bodies and unknown tool arguments are omitted/redacted before storage. Document IDs, ticket IDs, amounts, destinations, and run IDs are retained. Do not put secrets into these fields. The reviewer token stays in browser memory, and API content renders via `textContent` rather than HTML insertion. Restarting or disconnecting the tab clears its credential.
+
+## Interactive scenarios and ongoing inventory
+
+See [the live demo/profile guide](live-demo-and-profile.md) for the new reviewer-only API endpoints and UI. `scenarios.py` owns the six immutable synthetic fixtures shared by CLI and dashboard. The runner accepts a scenario ID, rejects bodies, and calls the same `Store.submit` enforcement path as the agent endpoint. Reviewer privileges now include triggering these bounded simulations; arbitrary reviewer tool calls remain disallowed.
+
+`agent_profiles` stores metadata with an optimistic revision; `profile_history` records each revision's snapshot, timestamp, and actor. Startup creates both tables and inserts the initial support-agent profile only if absent. Existing actions remain intact. Model connections are declared inventory with an unverified label, not live integrations. Profile tools and scopes are derived from policy code; metadata updates cannot alter permissions. Profile activity is aggregated over all stored actions, independently of the list endpoint's 200-row limit.

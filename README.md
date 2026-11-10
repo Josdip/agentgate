@@ -8,6 +8,12 @@ AgentGate is a local security gateway for a synthetic customer-support agent. It
 
 **Status:** working portfolio prototype. Business data and tool effects are synthetic. The demo is scripted; no LLM or paid provider account is required.
 
+## Live dashboard and agent profile
+
+Run each of the six cases individually from the dashboard and watch its policy result appear. Activity updates every three seconds. Maintain a persistent agent profile with versioned model inventory, lifetime activity, and tool permissions derived from the enforced policy. Registered models are labeled unverified until real integrations exist.
+
+See [the interactive demo and profile guide](docs/live-demo-and-profile.md) for usage and existing-clone update instructions.
+
 ## What you can demonstrate
 
 - A scoped document read and $25 refund execute successfully.
@@ -27,13 +33,13 @@ python3 -m venv .venv
 .venv/bin/python -m agentgate
 ```
 
-In another terminal:
+Connect in the dashboard and click **Run scenario** on any of the six cards. The CLI demo is also available in another terminal:
 
 ```bash
 .venv/bin/python examples/demo.py
 ```
 
-Open [the local dashboard](http://127.0.0.1:8000). The launcher generates `.env`; use its `AGENTGATE_REVIEWER_TOKEN` to connect. Inspect activity, then approve or reject the pending refund. Credentials and SQLite data are ignored by Git.
+Open [the local dashboard](http://127.0.0.1:8000). The launcher generates `.env`; use its `AGENTGATE_REVIEWER_TOKEN` to connect. Run cases individually, inspect their results, then approve or reject the pending refund. Credentials and SQLite data are ignored by Git.
 
 ![Verified local reviewer dashboard](docs/images/dashboard.png)
 
@@ -63,6 +69,7 @@ Tests cover authorization boundaries, malformed arguments, refund thresholds, de
 
 | Guide | Contents |
 |---|---|
+| [Live demo & profile](docs/live-demo-and-profile.md) | Individual scenarios, profile editing, model inventory, upgrade guide |
 | [Development](docs/development.md) | Setup, demo, configuration, checks, Git workflow, troubleshooting |
 | [Architecture](docs/architecture.md) | Components, request lifecycle, policy table, API, state, privacy |
 | [Threat model](docs/threat-model.md) | Assets, attack cases, controls, limitations |

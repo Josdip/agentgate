@@ -33,3 +33,9 @@ Scope: one developer machine, one synthetic business, one support agent, one rev
 ## Safe demonstration
 
 Use only synthetic data and simulated tools. Keep the server bound to `127.0.0.1`. Tokens are generated into the ignored `.env` file with owner-only permissions by the local launcher. Never paste a real production API key into this project or commit `.env` or databases.
+
+## Dashboard demo and inventory boundary
+
+The reviewer can now trigger six predefined synthetic scenarios. Those endpoints accept no tool parameters or identities from the browser; unknown scenario IDs and request bodies are rejected. The agent credential cannot run reviewer demo endpoints, read profile metadata, or edit inventory. Refund approval remains a separate operation.
+
+Profile updates allow metadata only and cannot grant tool permissions or set verification state. A revision precondition prevents concurrent edits from silently overwriting each other. Profile history retains past values, including removed model entries. Provider/model names are unverified declarations: do not infer an active LLM connection or automatic discovery. No credentials are collected by the inventory form.

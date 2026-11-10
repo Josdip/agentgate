@@ -17,7 +17,7 @@ python3 -m venv .venv
 
 The launcher creates `.env` with two random credentials, creates `data/agentgate.db`, and starts on `http://127.0.0.1:8000`. Environment variables override `.env` values. Never reuse the two tokens. If tokens are missing, shorter than 24 characters, or identical, startup fails.
 
-In a second terminal:
+You can run all six cases individually from the dashboard after connecting. See [live demo and profile](live-demo-and-profile.md). To run the optional batch CLI, use a second terminal:
 
 ```bash
 .venv/bin/python examples/demo.py
@@ -25,7 +25,7 @@ In a second terminal:
 
 The script prints six expected outcomes: two executions, one pending review, and three denials. Every invocation gets a new run ID and adds six new records. It submits real HTTP requests to the local gateway, but all business tool effects are simulated.
 
-Open the dashboard, copy `AGENTGATE_REVIEWER_TOKEN` from your local `.env` into the reviewer access field, and connect. Inspect denied requests and approve or reject the $250 refund. Refresh to retrieve new activity. An action can only be reviewed once.
+Open the dashboard, copy `AGENTGATE_REVIEWER_TOKEN` from your local `.env` into the reviewer access field, and connect. Inspect denied requests and approve or reject the $250 refund. Activity updates automatically every three seconds while the tab is visible; Refresh also retrieves activity. An action can only be reviewed once.
 
 Stop the server with Ctrl+C. Audit data persists across restarts. To start a clean demonstration, stop the server and set `AGENTGATE_DB` to a new local database path. Rotating credentials requires updating `.env` and restarting.
 
@@ -40,7 +40,7 @@ Or run Ruff lint, Ruff formatting checks, and Pytest separately as shown in the 
 ## Project map
 
 ```text
-agentgate/              API, policy, persistence, development launcher
+agentgate/              API, policy, profile persistence, scenario catalog, launcher
 agentgate/static/       Reviewer dashboard (no build step)
 examples/demo.py        Scripted support-agent tool requests
 tests/                 Policy, persistence, concurrency, authorization tests

@@ -20,3 +20,11 @@ No real agent framework, paid model provider, customer records, refunds, or exte
 - The current Starlette release emits a TestClient deprecation warning for its httpx adapter; tests still pass. Migrate the test adapter in a future dependency update.
 
 GitHub Actions passed on the pushed implementation: [initial CI run](https://github.com/Josdip/agentgate/actions/runs/42732454724). Local `main` tracks `origin/main`; project source and meaningful commit history are synchronized. Runtime credentials, virtual environment, and SQLite files are untracked.
+
+## Interactive demo and ongoing agent profile — November 9, 2026
+
+Added six individual dashboard scenario controls, immediate policy results, and three-second polling for activity/profile updates. The CLI shares the scenario catalog. Reviewer-only demo endpoints accept fixed scenario IDs, reject request overrides, and preserve separate refund approval.
+
+Added persistent agent identity metadata, declared provider/model inventory, enforced tool/permission descriptions, lifetime action totals and last activity, and versioned profile history with concurrent-edit protection. Existing SQLite audit data is preserved. Model entries remain explicitly unverified; no provider credentials or live LLM calls are introduced.
+
+Validation: 39 automated tests pass, with the existing upstream TestClient deprecation warning. Browser testing ran all six cases individually, approved the large refund, and saved a model inventory entry at revision 2. Screenshots are in `docs/images/live-demo.png` and `docs/images/agent-profile.png`. The temporary QA service used port 8011 and was stopped after verification.
