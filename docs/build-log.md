@@ -56,3 +56,13 @@ Verification: 55 Python tests and five dependency-free JavaScript state tests pa
 On `codex/theme-toggle`, added an accessible header control and full-workspace light/dark semantic palettes. Only the validated preference is persisted; blocked storage does not disable switching, and authentication/API behavior is unchanged. Builds on the readable-interface task branch without merging to main.
 
 Verification: 55 Python tests and nine interface tests pass. Browser checks covered keyboard switching, reload persistence, navigation, connected demos, dark approval context, and a 390px mobile layout. Both palette contrast checks passed. The temporary QA server was stopped. Details and screenshots are in `docs/theme-toggle.md`.
+
+## Editable per-agent rules — November 10, 2026
+
+On `codex/agent-rules`, added a real Rules page with per-agent add/edit/delete, structured decisions/targets/amount limits, and versioned history. Stored rules now drive gateway decisions and profile permissions; fixed schema/identity/reviewer boundaries remain immutable. Audit records identify policy revision and concrete rule, rule edits are concurrency-checked, and old/legacy pending approvals cannot execute after permission changes. Existing data is migrated without resetting configured policies.
+
+Validation: 80 Python tests and 11 interface tests pass. Browser checks confirmed CRUD, delete cancellation/history, a $25 refund becoming pending after a $20 limit, preserved drafts/stale edit rejection, and stale approval rejection. Both themes and 390px navigation were checked. QA used a temporary database/port 8011 and was stopped. Documentation records default-versus-custom demo expectations and prototype limits.
+
+## Approved earlier interface/theme merges
+
+At the owner's explicit request, merged PR #1 (readable interface) and PR #2 (theme toggle) to main, preserving their commits. The in-progress Rules work remained separate on `codex/agent-rules`, and was fast-forwarded over main's identical baseline tree without discarding edits. No deployment was performed.

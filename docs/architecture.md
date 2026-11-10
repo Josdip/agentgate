@@ -1,5 +1,7 @@
 # Architecture
 
+For the current editable policy layer, see [agent rules](agent-rules.md). Tables and thresholds below describe initial defaults; active permissions now come from stored, versioned per-agent rules.
+
 ## Implemented flow
 
 ```mermaid

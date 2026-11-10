@@ -1,4 +1,4 @@
-"""Pure, deterministic policy evaluation; no caller-supplied identity."""
+"""Pure rule evaluation. Runtime passes stored rules; defaults support seed examples/tests."""
 
 from dataclasses import dataclass
 from typing import Literal
@@ -51,6 +51,7 @@ class Decision:
     rule: str
     reason: str
     risk: str
+    matched_rule_id: str | None = None
 
 
 SCHEMAS = {
@@ -62,7 +63,7 @@ SCHEMAS = {
     "payments.create": PaymentArgs,
 }
 DOCUMENTS = {
-    "refund-policy": "Refunds over $100 require human approval. All refunds are simulated.",
+    "refund-policy": "Refund requests follow this agent’s current gateway rules. All refunds are simulated.",
     "support-handbook": "Use approved support channels. Never disclose internal records externally.",
 }
 
@@ -90,61 +91,108 @@ SCOPE_FIELDS = {
 }
 
 
-def tool_permissions(agent_id="support-agent"):
-    result = []
-    for tool, scope in AGENTS[agent_id]["tools"].items():
-        entry = {
+def default_rules(agent_id):
+    return [
+        {
+            "id": "default-" + tool.replace(".", "-"),
+            "name": TOOL_LABELS[tool],
             "tool": tool,
-            "permission": TOOL_LABELS[tool],
-            "scope": scope,
-            "approval": "Not required within scope",
+            "decision": "allow",
+            "scope": list(scope),
+            "approval_threshold_cents": (
+                REFUND_LIMIT_CENTS
+                if tool == "refunds.create"
+                else PAYMENT_LIMIT_CENTS
+                if tool == "payments.create"
+                else None
+            ),
         }
-        if tool in {"refunds.create", "payments.create"}:
-            limit = REFUND_LIMIT_CENTS if tool == "refunds.create" else PAYMENT_LIMIT_CENTS
+        for tool, scope in AGENTS[agent_id]["tools"].items()
+    ]
+
+
+def tool_permissions(agent_id="support-agent", rules=None):
+    result = []
+    for rule in sorted(
+        default_rules(agent_id) if rules is None else rules, key=lambda item: item["tool"]
+    ):
+        entry = {
+            "tool": rule["tool"],
+            "permission": TOOL_LABELS[rule["tool"]],
+            "scope": rule["scope"],
+            "rule_id": rule["id"],
+            "decision": rule["decision"],
+            "approval": {
+                "allow": "Not required within scope",
+                "deny": "Blocked for this agent",
+                "review": "Human approval required for every request",
+            }[rule["decision"]],
+        }
+        if rule["decision"] == "allow" and rule["approval_threshold_cents"] is not None:
+            limit = rule["approval_threshold_cents"]
             entry.update(
                 automatic_limit_cents=limit,
-                approval=f"Human approval above ${limit // 100} per request",
+                approval=f"Human approval above ${limit / 100:,.2f} per request",
             )
         result.append(entry)
     return result
 
 
-def evaluate(call: ToolCall, agent_id="support-agent") -> Decision:
+def evaluate(call: ToolCall, agent_id="support-agent", rules=None) -> Decision:
     if agent_id not in AGENTS:
         return Decision("denied", "agent.unknown", "Agent identity is not registered.", "high")
     if call.tool not in SCHEMAS:
         return Decision("denied", "tool.allowlist", "Tool is not registered.", "high")
     SCHEMAS[call.tool].model_validate(call.arguments)
-    tools = AGENTS[agent_id]["tools"]
-    if call.tool not in tools:
+    configured = default_rules(agent_id) if rules is None else rules
+    rule = next((item for item in configured if item["tool"] == call.tool), None)
+    if rule is None:
+        return Decision(
+            "denied", "agent.tool_scope", "No rule grants this agent access to this tool.", "high"
+        )
+    matched = rule["id"]
+    if rule["decision"] == "deny":
+        return Decision(
+            "denied", "rule.deny", "This tool is blocked by the agent’s rule.", "high", matched
+        )
+    if call.arguments[SCOPE_FIELDS[call.tool]] not in rule["scope"]:
+        classification = {
+            "documents.read": "documents.scope",
+            "messages.send": "messages.destination",
+        }.get(call.tool, "resource.scope")
         return Decision(
             "denied",
-            "agent.tool_scope",
-            "This agent does not have permission to use this tool.",
-            "high",
-        )
-    if call.arguments[SCOPE_FIELDS[call.tool]] not in tools[call.tool]:
-        rule = {"documents.read": "documents.scope", "messages.send": "messages.destination"}.get(
-            call.tool, "resource.scope"
-        )
-        return Decision(
-            "denied",
-            rule,
+            classification,
             "The requested resource or destination is outside this agent’s approved access.",
             "high",
+            matched,
         )
-    if call.tool in {"refunds.create", "payments.create"}:
-        limit = REFUND_LIMIT_CENTS if call.tool == "refunds.create" else PAYMENT_LIMIT_CENTS
-        if call.arguments["amount_cents"] > limit:
-            rule = "refunds.approval" if call.tool == "refunds.create" else "payments.approval"
-            return Decision(
-                "pending",
-                rule,
-                f"Amount exceeds ${limit // 100}; human approval required.",
-                "medium",
-            )
+    if rule["decision"] == "review":
+        return Decision(
+            "pending",
+            "rule.review",
+            "The agent’s rule requires a human decision for every request to this tool.",
+            "medium",
+            matched,
+        )
+    limit = rule["approval_threshold_cents"]
+    if limit is not None and call.arguments["amount_cents"] > limit:
+        classification = (
+            "refunds.approval" if call.tool == "refunds.create" else "payments.approval"
+        )
+        return Decision(
+            "pending",
+            classification,
+            f"Amount exceeds ${limit / 100:,.2f}; human approval required.",
+            "medium",
+            matched,
+        )
     return Decision(
-        "allowed", "tool.scoped", "Action is within this agent’s approved permissions.", "low"
+        "allowed",
+        "tool.scoped",
+        "Action is within this agent’s approved permissions.",
+        "low",
+        matched,
     )
 
 

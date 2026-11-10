@@ -53,8 +53,8 @@ async function api(path, options = {}) {
   if(requestSession!==sessionVersion || !token) throw new Error('Your access changed. Connect again to continue.');
   if(!response.ok) {
     if(response.status===401) throw new Error('Access was not accepted. Check that you used the reviewer token, then reconnect.');
-    if(response.status===409) throw new Error('This record changed. Refresh activity, or reopen the agent profile before saving.');
-    if(response.status===422) throw new Error('Some values are not valid. Check field lengths and provider/model names; model entries must be unique.');
+    if(response.status===409) throw new Error(path.includes('/rules')?'Rules changed or this tool already has a rule. Refresh rules, then reopen the editor.':path.endsWith('/review')?'This request was already reviewed or its permissions changed. Refresh activity; if still pending, reject it and submit a new request.':'This record changed. Refresh activity, or reopen the agent profile before saving.');
+    if(response.status===422) throw new Error(path.includes('/rules')?'Rule values were not accepted. Choose a registered tool, unique exact targets, and a valid approval limit.':'Some values are not valid. Check field lengths and provider/model names; model entries must be unique.');
     throw new Error(`AgentGate could not complete this request (${response.status}). Please retry.`);
   }
   const result=await response.json();
@@ -69,6 +69,11 @@ let activeProfileId = null;
 let summary = null;
 let routeVersion = 0;
 let requestedAgentFilter = null;
+let rulesState=null;
+let rulesAgentId='support-agent';
+let editingRuleId=null;
+let pendingRuleDelete=null;
+let ruleMutationBusy=false;
 const agentName = (id) => agents.find(a => a.agent_id === id)?.display_name || id;
 const money = (cents) => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents / 100);
 function actionTitle(action) {
@@ -83,6 +88,8 @@ function actionCard(action, compact = false) {
   card.append(head,element('p',`${agentName(action.agent_id)} · ${new Date(action.created_at).toLocaleString()} · ${action.risk} action risk`,'rule'));
   if(compact) return card;
   card.append(element('p',action.reason,'reason'));
+  const policyLink=element('a','View current agent rules');policyLink.href=`/rules?agent_id=${action.agent_id}`;policyLink.dataset.nav='';
+  const policyNote=element('p',action.policy_revision?`Evaluated with policy revision ${action.policy_revision}. `:'Legacy decision: policy revision was not recorded. ','rule');policyNote.append(policyLink);card.append(policyNote);
   const details=element('details');
   details.append(element('summary','View evidence'),element('pre',JSON.stringify(action,null,2)));
   card.append(details);
@@ -205,7 +212,8 @@ function renderProfile() {
       element('p', `Scope: ${tool.scope.join(', ')}`, 'help'), element('p', tool.approval, 'rule'));
     tools.append(card);
   }
-  container.append(tools, element('p', 'All other tools are blocked. This agent cannot approve its own requests. Access is enforced by the gateway.', 'help'));
+  const rulesLink=element('a','View and manage this agent’s rules →');rulesLink.href=`/rules?agent_id=${profile.agent_id}`;rulesLink.dataset.nav='';container.append(rulesLink);
+  container.append(tools, element('p', 'Each tool follows the rule shown above. A tool without a rule is blocked. This agent cannot approve its own requests.', 'help'));
   syncRows($('history-list'),profile.history,entry=>String(entry.revision),entry=>JSON.stringify(entry),entry=>{
     const item=element('details');
     item.append(element('summary',`Revision ${entry.revision} · ${new Date(entry.changed_at).toLocaleString()} · ${entry.changed_by}`),element('pre',JSON.stringify(entry.metadata,null,2)));
@@ -221,7 +229,7 @@ function renderScenarios() {
   syncRows(container,items,item=>item.id,item=>JSON.stringify([item,demoResults.get(item.id),runningScenarios.has(item.id)]),item=>{
     const index=items.indexOf(item);
     const card = element('article', undefined, 'scenario');
-    card.append(element('div', `Case ${index + 1} · Expected: ${decisionLabel(item.expected)}`, 'eyebrow'),
+    card.append(element('div', `Case ${index + 1} · Default expectation: ${decisionLabel(item.expected)}`, 'eyebrow'),
       element('h3', item.name), element('p', item.description, 'help'));
     const request = element('details');
     request.append(element('summary', 'Preview tool request'), element('pre', JSON.stringify({tool:item.tool, arguments:item.arguments}, null, 2)));
@@ -249,7 +257,7 @@ function renderScenarios() {
       const output = element('div', undefined, 'scenario-result');
       output.setAttribute('aria-live', 'polite');
       output.append(element('span', decisionLabel(current.outcome), `badge ${current.outcome}`),
-        element('p', result.matched ? 'The initial decision matched this case’s expected result.' : 'This case returned an unexpected decision.', 'rule'),
+        element('p', result.matched ? 'The initial decision matched this case’s default expectation.' : 'This decision differs from the default expectation. Check this agent’s current rules.', 'rule'),
         element('p', current.reason, 'help'), element('p', `Rule: ${current.rule} · Risk: ${current.risk}`, 'rule'));
       const details = element('details');
       details.append(element('summary', 'View recorded result'), element('pre', JSON.stringify(current, null, 2)));
@@ -277,6 +285,7 @@ function showLoadError(error) {
   $('live-state').textContent=cached?'Updates paused · data may be stale':'Unavailable';
   describeUpdate();
   if(cached) $('last-updated').textContent+=' · may be out of date';
+  if(location.pathname==='/rules')$('rules-status').textContent=cached?'Rules may be out of date. Refresh before making changes.':'Rules are unavailable. Check your connection and retry.';
   if(!cached) {
     if(location.pathname==='/') {
       for(const key of ['total','denied','pending','executed'])$(key).textContent='—';
@@ -327,6 +336,12 @@ async function load(quiet=false) {
       $('activity-count').textContent=`${page.total} matching ${page.total===1?'action':'actions'} · Showing ${page.items.length} · ${before?'Older results; automatic updates paused':'Newest first'}`;
       $('older').disabled=!nextCursor;$('newer').disabled=!cursorStack.length;
       $('page-label').textContent=`Page ${cursorStack.length+1} · Up to 20 actions`;
+    } else if(pagePath==='/rules') {
+      populateRulesAgents();
+      if(!agents.some(agent=>agent.agent_id===rulesAgentId))throw new Error('Agent not found. Choose a registered agent.');
+      const next=await api(`/api/agents/${encodeURIComponent(rulesAgentId)}/rules`);if(!isCurrent())return;
+      if(!rulesState || JSON.stringify(rulesState)!==JSON.stringify(next)){rulesState=next;renderRules();}
+      $('rules-workspace').hidden=false;
     } else if(activeProfileId) {
       const next=agents.find(a=>a.agent_id===activeProfileId);
       if(!next){$('profile-panel').hidden=true;throw new Error('This agent was not found. Return to Agents to choose a registered profile.');}
@@ -344,9 +359,10 @@ async function load(quiet=false) {
   }
 }
 function route() {
+  if($('delete-rule-dialog').open){$('delete-rule-dialog').close();pendingRuleDelete=null;}
   routeVersion++;
   const path=location.pathname;
-  $('home-page').hidden=path!=='/';$('agents-page').hidden=!path.startsWith('/agents');$('activity-page').hidden=path!=='/activity';
+  $('home-page').hidden=path!=='/';$('agents-page').hidden=!path.startsWith('/agents');$('activity-page').hidden=path!=='/activity';$('rules-page').hidden=path!=='/rules';
   activeProfileId=path.startsWith('/agents/') ? decodeURIComponent(path.split('/')[2]) : null;
   $('profile-panel').hidden=true;
   $('directory-panel').hidden=Boolean(activeProfileId);
@@ -356,9 +372,10 @@ function route() {
   $('profile-status').textContent='';
   const query=new URLSearchParams(location.search);
   requestedAgentFilter=query.get('agent_id');
+  if(path==='/rules'){rulesAgentId=query.get('agent_id')||'support-agent';rulesState=null;$('rules-workspace').hidden=true;$('rules-status').textContent=token?'Loading rules…':'Connect with your reviewer token to view and manage rules.';closeRuleEditor();}
   for (const [id,key] of [['activity-agent','agent_id'],['filter','outcome'],['risk-filter','risk'],['activity-search','search']]) $(id).value=query.get(key)||'';
   document.querySelectorAll('nav a').forEach(link=>{const current=link.pathname==='/'?path==='/':path.startsWith(link.pathname);link.classList.toggle('active',current);if(current)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');});
-  document.title=`AgentGate · ${path.startsWith('/agents')?'Agents':path==='/activity'?'Activity & decisions':'Overview'}`;
+  document.title=`AgentGate · ${path.startsWith('/agents')?'Agents':path==='/activity'?'Activity & decisions':path==='/rules'?'Rules':'Overview'}`;
   if([...$('activity-agent').options].some(option=>option.value===requestedAgentFilter))requestedAgentFilter=null;
   describeUpdate();
   if (path === '/' && scenarioItems.length) renderScenarios();
@@ -368,7 +385,7 @@ document.addEventListener('click',event=>{
   const link=event.target.closest('a[data-nav]');
   if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.button!==0) return;
   event.preventDefault();history.pushState({},'',link.href);route();window.scrollTo(0,0);
-  const heading=document.querySelector('#home-page:not([hidden]) h1, #agents-page:not([hidden]) h1, #activity-page:not([hidden]) h1');
+  const heading=document.querySelector('#home-page:not([hidden]) h1, #agents-page:not([hidden]) h1, #activity-page:not([hidden]) h1, #rules-page:not([hidden]) h1');
   if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
 });
 window.addEventListener('popstate',route);
@@ -379,6 +396,10 @@ $('connect').addEventListener('click',()=>{
 });
 $('token').addEventListener('keydown',event=>{if(event.key==='Enter')$('connect').click();});
 $('disconnect').addEventListener('click',()=>{
+  rulesState=null;pendingRuleDelete=null;closeRuleEditor();$('rules-workspace').hidden=true;$('rules-list').replaceChildren();$('rules-history').replaceChildren();$('rules-status').textContent='Connect with your reviewer token to view and manage rules.';
+  if($('delete-rule-dialog').open)$('delete-rule-dialog').close();
+  $('rules-agent').replaceChildren(new Option('Connect to load agents',''));$('rules-agent').disabled=true;delete $('rules-agent').dataset.choices;
+  $('activity-agent').replaceChildren(new Option('All agents',''));
   sessionVersion++;token='';actions=[];agents=[];profile=null;summary=null;scenarioItems=[];demoResults.clear();runningScenarios.clear();editorReady=false;loadedAt.clear();
   $('disconnect').hidden=true;
   $('scenarios').replaceChildren(element('div','Connect to run demo cases.','empty'));
@@ -408,6 +429,119 @@ $('profile-form').addEventListener('submit',async event=>{
     await load(true);
   } catch(error){$('profile-status').textContent=error.message;}
   finally{$('save-profile').disabled=false;}
+});
+function populateRulesAgents() {
+  $('rules-agent').disabled=false;
+  const choices=agents.map(agent=>[agent.agent_id,agent.display_name]);
+  if($('rules-agent').dataset.choices!==JSON.stringify(choices)) {
+    $('rules-agent').replaceChildren(...choices.map(([id,name])=>new Option(name,id)));
+    $('rules-agent').dataset.choices=JSON.stringify(choices);
+  }
+  $('rules-agent').value=rulesAgentId;
+}
+function ruleDescription(rule) {
+  if(rule.decision==='deny')return 'Block every request to this tool.';
+  if(rule.decision==='review')return 'Require a human decision for every request within the approved targets.';
+  if(rule.approval_threshold_cents!==null)return `Allow up to ${money(rule.approval_threshold_cents)} per request; larger amounts require review.`;
+  return 'Allow requests within the approved targets.';
+}
+function renderRules() {
+  $('rules-heading').textContent=`Rules for ${agentName(rulesAgentId)}`;
+  $('rules-revision').textContent=`Policy revision ${rulesState.revision} · Updated ${new Date(rulesState.updated_at).toLocaleString()}`;
+  $('rules-status').textContent='Rules shown here are enforced by the gateway. Changing a rule changes active permissions.';
+  $('add-rule').disabled=rulesState.rules.length>=rulesState.catalog.length || ruleMutationBusy;
+  if(!rulesState.rules.length)$('rules-list').replaceChildren(element('div','No rules are configured. All tool requests from this agent are blocked until you add a rule.','empty'));
+  else syncRows($('rules-list'),rulesState.rules,rule=>rule.id,rule=>JSON.stringify(rule),rule=>{
+    const card=element('article',undefined,'action rule-card');
+    const head=element('div',undefined,'action-head');
+    head.append(element('strong',rule.name),element('span',{allow:'Allow within scope',deny:'Blocked',review:'Review required'}[rule.decision],`badge ${rule.decision==='deny'?'denied':rule.decision==='review'?'pending':'unverified'}`));
+    card.append(head,element('p',rulesState.catalog.find(tool=>tool.tool===rule.tool).label,'rule'),element('p',ruleDescription(rule),'reason'));
+    if(rule.decision!=='deny')card.append(element('p',`Approved targets: ${rule.scope.join(', ')}`,'help'));
+    const buttons=element('div',undefined,'review');
+    const edit=element('button','Edit rule','secondary');edit.addEventListener('click',()=>openRuleEditor(rule.id));
+    const remove=element('button','Delete rule','reject');remove.addEventListener('click',()=>{
+      pendingRuleDelete={id:rule.id,agent:rulesAgentId,revision:rulesState.revision,session:sessionVersion};
+      $('delete-rule-message').textContent=`Delete “${rule.name}” for ${agentName(rulesAgentId)}?`;
+      $('delete-rule-status').textContent='';$('delete-rule-dialog').showModal();
+    });
+    buttons.append(edit,remove);card.append(buttons);return card;
+  });
+  syncRows($('rules-history'),rulesState.history,entry=>String(entry.revision),entry=>JSON.stringify(entry),entry=>{
+    const details=element('details');details.append(element('summary',`Revision ${entry.revision} · ${entry.operation} · ${entry.changed_by} · ${new Date(entry.changed_at).toLocaleString()}`),element('pre',JSON.stringify(entry.snapshot,null,2)));return details;
+  });
+  if(!$('rule-editor').hidden && Number($('rule-form').dataset.revision)!==rulesState.revision)$('rule-form-status').textContent='Rules changed while this editor was open. Cancel and reopen it before saving.';
+}
+function closeRuleEditor() {
+  editingRuleId=null;$('rule-editor').hidden=true;$('rule-form-status').textContent='';
+  $('rule-name').value='';$('rule-scope').value='';
+}
+function openRuleEditor(id=null) {
+  if(!rulesState || ruleMutationBusy)return;
+  const rule=rulesState.rules.find(item=>item.id===id);
+  editingRuleId=id;$('rule-form').dataset.revision=rulesState.revision;$('rule-form').dataset.agent=rulesAgentId;
+  $('rule-tool').replaceChildren(...rulesState.catalog.map(tool=>{
+    const option=new Option(`${tool.label} (${tool.tool})`,tool.tool);
+    option.disabled=rulesState.rules.some(item=>item.tool===tool.tool && item.id!==id);return option;
+  }));
+  const tool=rule?.tool || rulesState.catalog.find(item=>!rulesState.rules.some(current=>current.tool===item.tool))?.tool;
+  if(!tool)return;
+  $('rule-tool').value=tool;$('rule-decision').value=rule?.decision || 'allow';
+  $('rule-name').value=rule?.name || rulesState.catalog.find(item=>item.tool===tool).label;
+  $('rule-scope').value=(rule?.scope || rulesState.catalog.find(item=>item.tool===tool).suggested_targets).join('\n');
+  $('rule-limit').value=((rule?.approval_threshold_cents ?? (tool==='payments.create'?50000:10000))/100).toFixed(2);
+  $('rule-editor-title').textContent=rule?'Edit rule':'Add rule';$('rule-form-status').textContent='';
+  $('rule-editor').hidden=false;updateRuleFields();$('rule-name').focus();
+}
+function updateRuleFields() {
+  const tool=rulesState?.catalog.find(item=>item.tool===$('rule-tool').value);
+  const decision=$('rule-decision').value;
+  $('rule-scope-field').hidden=decision==='deny';$('rule-scope').required=decision!=='deny';
+  const monetary=Boolean(tool?.monetary)&&decision==='allow';
+  $('rule-limit-field').hidden=!monetary;$('rule-limit').required=monetary;
+  $('rule-target-help').textContent=tool?`Exact ${tool.scope_field} values only. Examples: ${tool.suggested_targets.join(', ')}. This does not connect new real business resources.`:'';
+}
+function dollarsToCents(value) {
+  if(!/^\d{1,5}(\.\d{1,2})?$/.test(value))throw new Error('Enter a nonnegative dollar amount with at most two decimal places.');
+  const [dollars,cents='']=value.split('.');const total=Number(dollars)*100+Number(cents.padEnd(2,'0'));
+  if(total>1000000)throw new Error('The automatic approval limit cannot exceed $10,000.');
+  return total;
+}
+$('add-rule').addEventListener('click',()=>openRuleEditor());
+$('cancel-rule').addEventListener('click',()=>{closeRuleEditor();$('add-rule').focus();});
+$('rule-decision').addEventListener('change',updateRuleFields);
+$('rule-tool').addEventListener('change',()=>{
+  const tool=rulesState.catalog.find(item=>item.tool===$('rule-tool').value);
+  $('rule-scope').value=tool.suggested_targets.join('\n');$('rule-limit').value=tool.tool==='payments.create'?'500.00':'100.00';updateRuleFields();
+});
+$('rules-agent').addEventListener('change',()=>{
+  rulesAgentId=$('rules-agent').value;rulesState=null;routeVersion++;loadedAt.delete('/rules');closeRuleEditor();
+  $('rules-workspace').hidden=true;$('rules-status').textContent='Loading rules…';history.replaceState({},'',`/rules?agent_id=${rulesAgentId}`);load();
+});
+$('reload-rules').addEventListener('click',()=>load());
+$('rule-form').addEventListener('submit',async event=>{
+  event.preventDefault();if(ruleMutationBusy||!rulesState)return;
+  const agent=$('rule-form').dataset.agent, revision=Number($('rule-form').dataset.revision), session=sessionVersion, ruleId=editingRuleId;
+  if(agent!==rulesAgentId || revision!==rulesState.revision){$('rule-form-status').textContent='Rules changed. Cancel and reopen the editor before saving.';return;}
+  try {
+    const tool=rulesState.catalog.find(item=>item.tool===$('rule-tool').value), decision=$('rule-decision').value;
+    const rule={name:$('rule-name').value.trim(),tool:tool.tool,decision,scope:decision==='deny'?[]:$('rule-scope').value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean),approval_threshold_cents:tool.monetary&&decision==='allow'?dollarsToCents($('rule-limit').value.trim()):null};
+    ruleMutationBusy=true;$('save-rule').disabled=true;
+    const next=await api(`/api/agents/${encodeURIComponent(agent)}/rules${ruleId?'/'+encodeURIComponent(ruleId):''}`,{method:ruleId?'PUT':'POST',body:JSON.stringify({revision,rule})});
+    if(session!==sessionVersion || agent!==rulesAgentId || location.pathname!=='/rules')return;
+    rulesState=next;closeRuleEditor();renderRules();$('rules-status').textContent=`Rule saved. Policy revision ${next.revision} is active now.`;$('add-rule').focus();
+  } catch(error){if(session===sessionVersion&&agent===rulesAgentId)$('rule-form-status').textContent=`${error.message} For exact targets, use one value per line; documents and tickets must exist in the demo.`;}
+  finally{ruleMutationBusy=false;$('save-rule').disabled=false;if(rulesState)$('add-rule').disabled=rulesState.rules.length>=rulesState.catalog.length;}
+});
+$('cancel-rule-delete').addEventListener('click',()=>{$('delete-rule-dialog').close();pendingRuleDelete=null;});
+$('confirm-rule-delete').addEventListener('click',async()=>{
+  const selected=pendingRuleDelete;if(!selected||ruleMutationBusy)return;
+  ruleMutationBusy=true;$('confirm-rule-delete').disabled=true;
+  try {
+    const next=await api(`/api/agents/${encodeURIComponent(selected.agent)}/rules/${encodeURIComponent(selected.id)}?revision=${selected.revision}`,{method:'DELETE'});
+    if(selected.session!==sessionVersion || selected.agent!==rulesAgentId || location.pathname!=='/rules')return;
+    rulesState=next;$('delete-rule-dialog').close();pendingRuleDelete=null;closeRuleEditor();renderRules();$('rules-status').textContent='Rule deleted. Requests to this tool are now blocked for this agent.';$('add-rule').focus();
+  }catch(error){if(selected.session===sessionVersion)$('delete-rule-status').textContent=`${error.message} Keep the rule, refresh, and try again.`;}
+  finally{ruleMutationBusy=false;$('confirm-rule-delete').disabled=false;if(rulesState)$('add-rule').disabled=rulesState.rules.length>=rulesState.catalog.length;}
 });
 $('demo-agent').addEventListener('change',renderScenarios);
 $('directory-search').addEventListener('input',renderDirectory);
