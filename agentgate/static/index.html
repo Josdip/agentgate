@@ -6,7 +6,19 @@
 <main>
 <section class="intro"><div class="eyebrow">AGENT SECURITY & GOVERNANCE</div><h1>Know what your agents do.<br><span>Control what happens next.</span></h1><p>Inspect tool activity, understand policy decisions, and review sensitive actions in one place.</p></section>
 <section class="connection" aria-label="Reviewer connection"><label for="token">Reviewer access token</label><div class="connect-row"><input id="token" type="password" autocomplete="off" placeholder="Enter your local reviewer token"><button id="connect">Connect</button><button id="disconnect" class="secondary" hidden>Disconnect</button></div><p id="status" role="status">Connect to load activity. Your token stays in this tab’s memory.</p></section>
+<section class="demo-panel" aria-labelledby="demo-title">
+<div class="section-heading"><div><div class="eyebrow">INTERACTIVE DEMO</div><h2 id="demo-title">Run one scenario at a time</h2><p>Six synthetic cases. Each request passes through the real gateway policy.</p></div><span class="environment" id="live-state">CONNECT TO BEGIN</span></div>
+<div id="scenarios" class="scenario-grid"><div class="empty">Connect with your reviewer token to run scenarios here.</div></div>
+</section>
+<section class="profile-panel" aria-labelledby="profile-title"><div class="section-heading"><div><div class="eyebrow">AGENT INVENTORY</div><h2 id="profile-title">Ongoing agent profile</h2><p>Persistent inventory, enforced permissions, and lifetime activity.</p></div></div>
+<div id="profile-summary" class="empty">Connect to load this agent’s profile.</div>
+<details id="profile-editor" hidden><summary>Edit profile & model inventory</summary>
+<p class="help">Register provider and model names only. Entries are unverified inventory; adding one does not connect an LLM. Do not enter API keys.</p>
+<form id="profile-form"><label for="agent-name">Display name</label><input id="agent-name" maxlength="100" required><label for="agent-description">Description</label><textarea id="agent-description" maxlength="500" rows="2"></textarea>
+<h3>Registered LLM connections</h3><div id="model-rows"></div><button type="button" id="add-model" class="secondary">Add model</button><button type="submit" id="save-profile">Save profile</button><p id="profile-status" role="status"></p></form></details>
+<details id="profile-history" hidden><summary>Profile change history</summary><div id="history-list"></div></details>
+</section>
 <section class="metrics" aria-label="Activity summary"><article><span>RECENT ACTIONS</span><strong id="total">—</strong></article><article><span>BLOCKED BY POLICY</span><strong id="denied">—</strong></article><article><span>AWAITING REVIEW</span><strong id="pending">—</strong></article><article><span>EXECUTED</span><strong id="executed">—</strong></article></section>
-<section class="activity"><div class="section-heading"><div><h2>Activity & decisions</h2><p>Latest 200 actions · support-agent</p></div><div class="controls"><label for="filter">Show</label><select id="filter"><option value="all">All decisions</option><option value="pending">Awaiting review</option><option value="denied">Blocked</option><option value="executed">Executed</option><option value="rejected">Rejected</option></select><button id="refresh" class="secondary">Refresh</button></div></div><div id="actions"><div class="empty">Connect your reviewer account to inspect agent activity.</div></div></section>
-<footer>AgentGate v0.1 · Rule-based enforcement · All tool effects are simulated</footer>
+<section class="activity"><div class="section-heading"><div><h2>Activity & decisions</h2><p>Latest 200 actions · support-agent · updates every 3 seconds</p></div><div class="controls"><label for="filter">Show</label><select id="filter"><option value="all">All decisions</option><option value="pending">Awaiting review</option><option value="denied">Blocked</option><option value="executed">Executed</option><option value="rejected">Rejected</option></select><button id="refresh" class="secondary">Refresh</button></div></div><div id="actions"><div class="empty">Connect your reviewer account to inspect agent activity.</div></div></section>
+<footer>AgentGate v0.2 · Rule-based enforcement · All tool effects are simulated</footer>
 </main></body></html>
