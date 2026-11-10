@@ -1,5 +1,9 @@
 'use strict';
 let token = '';
+let demoAccess = false;
+let accessMode = 'loading';
+let accessBusy = false;
+const hasAccess = () => demoAccess || Boolean(token);
 let actions = [];
 const $ = (id) => document.getElementById(id);
 const status = (message) => { $('status').textContent = message; };
@@ -46,19 +50,19 @@ async function api(path, options = {}) {
   const requestSession=sessionVersion;
   let response;
   try {
-    response=await fetch(path,{...options,headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'}});
+    response=await fetch(path,{...options,headers:{...(demoAccess?{'X-AgentGate-Demo':'browser'}:{'Authorization':`Bearer ${token}`}), 'Content-Type':'application/json'}});
   } catch {
     throw new Error('Could not reach AgentGate. Check that your local server is running, then retry.');
   }
-  if(requestSession!==sessionVersion || !token) throw new Error('Your access changed. Connect again to continue.');
+  if(requestSession!==sessionVersion || !hasAccess()) throw new Error('Your access changed. Connect again to continue.');
   if(!response.ok) {
-    if(response.status===401) throw new Error('Access was not accepted. Check that you used the reviewer token, then reconnect.');
+    if(response.status===401){if(demoAccess)$('retry-demo').hidden=false;throw new Error(demoAccess?'The demo connection expired. Select Retry connection or reload the page.':'Access was not accepted. Check your reviewer credential, then reconnect.');}
     if(response.status===409) throw new Error(path.includes('/rules')?'Rules changed or this tool already has a rule. Refresh rules, then reopen the editor.':path.endsWith('/review')?'This request was already reviewed or its permissions changed. Refresh activity; if still pending, reject it and submit a new request.':'This record changed. Refresh activity, or reopen the agent profile before saving.');
     if(response.status===422) throw new Error(path.includes('/rules')?'Rule values were not accepted. Choose a registered tool, unique exact targets, and a valid approval limit.':'Some values are not valid. Check field lengths and provider/model names; model entries must be unique.');
     throw new Error(`AgentGate could not complete this request (${response.status}). Please retry.`);
   }
   const result=await response.json();
-  if(requestSession!==sessionVersion || !token) throw new Error('Your access changed. Connect again to continue.');
+  if(requestSession!==sessionVersion || !hasAccess()) throw new Error('Your access changed. Connect again to continue.');
   return result;
 }
 let agents = [];
@@ -137,7 +141,7 @@ function renderOverview() {
   else syncRows($('recent-actions'),summary.recent,a=>a.id,a=>JSON.stringify([a,agentName(a.agent_id)]),a=>actionCard(a,true));
 }
 function renderDirectory() {
-  if(!token || !loadedAt.has('directory')) {
+  if(!hasAccess() || !loadedAt.has('directory')) {
     $('agent-count').textContent='Connect to load your agent inventory.';
     $('agent-directory').replaceChildren();return;
   }
@@ -237,7 +241,7 @@ function renderScenarios() {
     const result = demoResults.get(item.id);
     const busy = runningScenarios.has(item.id);
     const run = element('button', busy ? 'Evaluating…' : result ? 'Run again' : 'Run scenario');
-    run.disabled = busy || !token;
+    run.disabled = busy || !hasAccess();
     run.addEventListener('click', async () => {
       const runSession=sessionVersion;
       runningScenarios.add(item.id); renderScenarios();
@@ -285,6 +289,7 @@ function showLoadError(error) {
   $('live-state').textContent=cached?'Updates paused · data may be stale':'Unavailable';
   describeUpdate();
   if(cached) $('last-updated').textContent+=' · may be out of date';
+  if(demoAccess)$('retry-demo').hidden=false;
   if(location.pathname==='/rules')$('rules-status').textContent=cached?'Rules may be out of date. Refresh before making changes.':'Rules are unavailable. Check your connection and retry.';
   if(!cached) {
     if(location.pathname==='/') {
@@ -297,11 +302,11 @@ function showLoadError(error) {
   }
 }
 async function load(quiet=false) {
-  if(!token) {if(!quiet)status('Not connected. Enter your reviewer token to load the workspace.');return;}
+  if(!hasAccess()){if(!quiet)status(accessMode==='authenticated'?'Connect with a reviewer credential to load this service.':'Opening your demo workspace…');return;}
   if(loading) {reloadRequested=true;return;}
   loading=true;
   const version=routeVersion, requestSession=sessionVersion, pagePath=location.pathname;
-  const isCurrent=()=>version===routeVersion && requestSession===sessionVersion && Boolean(token);
+  const isCurrent=()=>version===routeVersion && requestSession===sessionVersion && hasAccess();
   const priorState=document.querySelector('.connection').dataset.state;
   if(!quiet) {status('Loading your workspace…');document.querySelector('.connection').dataset.state='loading';}
   if(!loadedAt.has(pagePath)) {
@@ -349,9 +354,11 @@ async function load(quiet=false) {
     }
     loadedAt.set(pagePath,new Date());describeUpdate();
     document.querySelector('.connection').dataset.state='connected';
+    if(demoAccess)$('retry-demo').hidden=true;
     $('disconnect').hidden=false;$('connect').textContent='Reconnect';
+    if(pagePath==='/')$('start-demo').disabled=false;
     $('live-state').textContent='Updates every 3 seconds';
-    if(!quiet || priorState==='stale' || priorState==='error') status('Connected as reviewer. Your token stays only in this tab.');
+    if(!quiet || priorState==='stale' || priorState==='error') status(demoAccess?'Demo ready. Explore the agents, try a request, or change a rule.':'Connected as reviewer. Your credential stays only in this tab.');
   } catch(error) {if(isCurrent())showLoadError(error);}
   finally {
     loading=false;
@@ -372,7 +379,7 @@ function route() {
   $('profile-status').textContent='';
   const query=new URLSearchParams(location.search);
   requestedAgentFilter=query.get('agent_id');
-  if(path==='/rules'){rulesAgentId=query.get('agent_id')||'support-agent';rulesState=null;$('rules-workspace').hidden=true;$('rules-status').textContent=token?'Loading rules…':'Connect with your reviewer token to view and manage rules.';closeRuleEditor();}
+  if(path==='/rules'){rulesAgentId=query.get('agent_id')||'support-agent';rulesState=null;$('rules-workspace').hidden=true;$('rules-status').textContent=hasAccess()?'Loading rules…':'Opening rules…';closeRuleEditor();}
   for (const [id,key] of [['activity-agent','agent_id'],['filter','outcome'],['risk-filter','risk'],['activity-search','search']]) $(id).value=query.get(key)||'';
   document.querySelectorAll('nav a').forEach(link=>{const current=link.pathname==='/'?path==='/':path.startsWith(link.pathname);link.classList.toggle('active',current);if(current)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');});
   document.title=`AgentGate · ${path.startsWith('/agents')?'Agents':path==='/activity'?'Activity & decisions':path==='/rules'?'Rules':'Overview'}`;
@@ -400,7 +407,7 @@ $('disconnect').addEventListener('click',()=>{
   if($('delete-rule-dialog').open)$('delete-rule-dialog').close();
   $('rules-agent').replaceChildren(new Option('Connect to load agents',''));$('rules-agent').disabled=true;delete $('rules-agent').dataset.choices;
   $('activity-agent').replaceChildren(new Option('All agents',''));
-  sessionVersion++;token='';actions=[];agents=[];profile=null;summary=null;scenarioItems=[];demoResults.clear();runningScenarios.clear();editorReady=false;loadedAt.clear();
+  sessionVersion++;token='';demoAccess=false;$('start-demo').disabled=true;actions=[];agents=[];profile=null;summary=null;scenarioItems=[];demoResults.clear();runningScenarios.clear();editorReady=false;loadedAt.clear();
   $('disconnect').hidden=true;
   $('scenarios').replaceChildren(element('div','Connect to run demo cases.','empty'));
   $('agent-directory').replaceChildren();$('actions').replaceChildren();$('recent-actions').replaceChildren();
@@ -549,5 +556,53 @@ $('activity-filters').addEventListener('submit',event=>{event.preventDefault();b
 $('older').addEventListener('click',()=>{if(!nextCursor||loading)return;cursorStack.push(before);before=nextCursor;load();});
 $('newer').addEventListener('click',()=>{if(!cursorStack.length||loading)return;before=cursorStack.pop();load();});
 $('refresh').addEventListener('click',()=>load());
-setInterval(()=>{if(token&&!document.hidden&&!(location.pathname==='/activity'&&before))load(true);},3000);
+setInterval(()=>{if(hasAccess()&&!document.hidden&&!(location.pathname==='/activity'&&before))load(true);},3000);
 route();
+
+async function initializeAccess() {
+  if(accessBusy)return;
+  accessBusy=true;$('retry-demo').disabled=true;
+  const currentSession=++sessionVersion;
+  try {
+    const modeResponse=await fetch('/api/access-mode',{credentials:'same-origin'});
+    if(!modeResponse.ok)throw new Error('Unable to open the demo. If you just updated AgentGate, restart its server.');
+    const mode=await modeResponse.json();if(currentSession!==sessionVersion)return;
+    if(mode.mode!=='local-demo') {
+      accessMode='authenticated';demoAccess=false;
+      document.querySelector('.connection').dataset.accessMode='authenticated';
+      $('access-title').textContent='Service access';
+      $('token-help').textContent='This service requires a reviewer credential. Use the local demo launcher for a no-sign-in walkthrough.';
+      $('manual-access').hidden=false;$('retry-demo').hidden=true;
+      status('Authenticated mode. Connect with a reviewer credential to continue.');return;
+    }
+    const response=await fetch('/api/demo/session',{method:'POST',credentials:'same-origin',headers:{'X-AgentGate-Demo':'browser','Content-Type':'application/json'}});
+    if(!response.ok)throw new Error('Local demo access was not accepted. Open AgentGate using its localhost address.');
+    if(currentSession!==sessionVersion)return;
+    token='';demoAccess=true;accessMode='local-demo';
+    document.querySelector('.connection').dataset.accessMode='demo';
+    $('access-title').textContent='Local demo workspace';
+    $('token-help').textContent='No sign-in needed. All agents, actions, and business data here are simulated.';
+    $('manual-access').hidden=true;$('retry-demo').hidden=true;
+    await load();
+  } catch(error) {
+    if(currentSession!==sessionVersion)return;
+    document.querySelector('.connection').dataset.state='error';
+    status(`${error.message} Check that AgentGate is running, then retry.`);$('retry-demo').hidden=false;
+  } finally {accessBusy=false;$('retry-demo').disabled=false;}
+}
+$('retry-demo').addEventListener('click',initializeAccess);
+$('start-demo').addEventListener('click',async()=>{
+  if(!hasAccess())return;
+  const session=sessionVersion;$('start-demo').disabled=true;
+  try {
+    const result=await api('/api/demo/scenarios/large-refund/run',{method:'POST'});
+    if(session!==sessionVersion)return;
+    demoResults.set('large-refund',result);
+    history.pushState({},'',`/activity?agent_id=support-agent&search=${encodeURIComponent(result.action.run_id)}`);
+    route();window.scrollTo(0,0);
+    const heading=$('activity-page').querySelector('h1');heading.tabIndex=-1;heading.focus({preventScroll:true});
+  } catch(error){if(session===sessionVersion)status(error.message);}
+  finally{$('start-demo').disabled=!hasAccess();}
+});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initializeAccess,{once:true});
+else if(document.readyState==='interactive'||document.readyState==='complete')initializeAccess();

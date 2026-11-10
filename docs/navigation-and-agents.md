@@ -1,5 +1,7 @@
 # Product pages and multi-agent demos
 
+> Current launcher: local demo access is automatic; no reviewer token entry is needed. See [local demo access](local-demo-access.md). Bearer-token instructions below apply to optional authenticated mode.
+
 ## Update your clone
 
 Stop the server with Ctrl+C, then run:

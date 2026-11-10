@@ -1,5 +1,7 @@
 # Live dashboard demo and agent profile
 
+> Current launcher: local demo access is automatic; no reviewer token entry is needed. See [local demo access](local-demo-access.md). Bearer-token instructions below apply to optional authenticated mode.
+
 Active permissions can now be edited on the dedicated [Rules page](agent-rules.md); earlier statements about code-only permissions describe the original prototype.
 
 For the latest three-agent navigation and fourteen-case behavior, see [navigation and multi-agent demos](navigation-and-agents.md). The sections below describe the original Support cases and the shared profile editor. Inventory is now on its own page; approvals are on Activity & decisions.

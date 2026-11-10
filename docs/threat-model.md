@@ -1,5 +1,7 @@
 # Threat model
 
+> Current launcher: local demo access is automatic; no reviewer token entry is needed. See [local demo access](local-demo-access.md). Bearer-token instructions below apply to optional authenticated mode.
+
 ## Assets and assumptions
 
 Protect tool authorization, approval integrity, audit confidentiality, and simulated business records. Treat agent-generated tool names and parameters as untrusted. A malicious instruction in retrieved content may influence an agent. Human reviewer credentials and the host running AgentGate are assumed trusted.

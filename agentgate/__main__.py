@@ -29,10 +29,20 @@ def main():
                 "AGENTGATE_DB",
                 "AGENTGATE_SALES_TOKEN",
                 "AGENTGATE_FINANCE_TOKEN",
+                "AGENTGATE_DEMO_MODE",
             }:
                 os.environ.setdefault(name, value)
-    print("Dashboard: http://127.0.0.1:8000 — reviewer token is in .env")
-    uvicorn.run(create_app(), host="127.0.0.1", port=8000)
+    demo_setting = os.environ.get("AGENTGATE_DEMO_MODE", "1")
+    if demo_setting not in {"0", "1"}:
+        raise RuntimeError("AGENTGATE_DEMO_MODE must be 0 or 1")
+    demo_mode = demo_setting == "1"
+    print("Dashboard: http://127.0.0.1:8000")
+    print(
+        "Local demo: open the dashboard; no sign-in needed."
+        if demo_mode
+        else "Authenticated mode: use the reviewer credential."
+    )
+    uvicorn.run(create_app(demo_mode=demo_mode), host="127.0.0.1", port=8000, proxy_headers=False)
 
 
 if __name__ == "__main__":

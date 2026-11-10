@@ -54,13 +54,13 @@ python3 -m venv .venv
 .venv/bin/python -m agentgate
 ```
 
-Connect in the dashboard and click **Run scenario** on any case for the selected agent. The CLI demo is also available in another terminal:
+Open [the local dashboard](http://127.0.0.1:8000); no sign-in or token entry is needed. Select **Try a $250 refund request** for a guided first action, then approve or reject it. Explore **Agents**, **Rules**, and the fourteen individual demo cases. The CLI demo is also available in another terminal:
 
 ```bash
 .venv/bin/python examples/demo.py
 ```
 
-Open [the local dashboard](http://127.0.0.1:8000). The launcher generates `.env`; use its `AGENTGATE_REVIEWER_TOKEN` to connect. Run cases individually, inspect their results, then approve or reject the pending refund. Credentials and SQLite data are ignored by Git.
+The launcher generates local settings in `.env`. Credentials and SQLite data are ignored by Git. Stop the server with Ctrl+C. See [local demo access](docs/local-demo-access.md) for the trust boundary and optional authenticated mode.
 
 ![Verified local reviewer dashboard](docs/images/dashboard.png)
 

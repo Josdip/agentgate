@@ -25,7 +25,7 @@ You can run all six cases individually from the dashboard after connecting. See 
 
 The script prints six expected outcomes: two executions, one pending review, and three denials. Every invocation gets a new run ID and adds six new records. It submits real HTTP requests to the local gateway, but all business tool effects are simulated.
 
-Open the dashboard, copy `AGENTGATE_REVIEWER_TOKEN` from your local `.env` into the reviewer access field, and connect. Inspect denied requests and approve or reject the $250 refund. Activity updates automatically every three seconds while the tab is visible; Refresh also retrieves activity. An action can only be reviewed once.
+Open the dashboard; local demo access starts automatically without token entry. Select **Try a $250 refund request**, then approve or reject it. The dashboard offers fourteen cases across three agents. Activity updates automatically every three seconds while the tab is visible; Refresh also retrieves activity. An action can only be reviewed once.
 
 Stop the server with Ctrl+C. Audit data persists across restarts. To start a clean demonstration, stop the server and set `AGENTGATE_DB` to a new local database path. Rotating credentials requires updating `.env` and restarting.
 
@@ -61,7 +61,7 @@ GitHub browser sign-in and the connected GitHub app are separate from terminal G
 - **409 on review:** another reviewer already decided the action. Refresh.
 - **Port 8000 in use:** stop the previous local instance before restarting.
 - **Tests stall only in a restricted runner:** run in a context that permits local async/thread operations; the full API suite uses FastAPI's TestClient.
-- **Empty dashboard:** connect with the reviewer credential, run the demo, and refresh.
+- **Empty dashboard:** restart the updated server, reload the page, and use Retry connection if shown. Run a demo case to create activity.
 
 For a future model-driven showcase, start with [the real-agent integration scaffold](real-agent-integration.md). Its unconfigured default safely prints setup guidance without making requests.
 

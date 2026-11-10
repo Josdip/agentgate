@@ -1,5 +1,7 @@
 # View and manage the rules behind agent decisions
 
+> Current launcher: local demo access is automatic; no reviewer token entry is needed. See [local demo access](local-demo-access.md). Bearer-token instructions below apply to optional authenticated mode.
+
 ## Use the Rules page
 
 Open **Rules** in the navigation and choose Support, Sales, or Finance. The page shows the actual saved rules enforced by the gateway, their policy revision, and change history. Agent profiles and detailed activity records link to this page. Activity evidence records the revision and matched rule ID; the link opens current rules, which may differ from an older decision.
