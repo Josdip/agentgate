@@ -45,6 +45,34 @@ DOCUMENTS = {
 }
 
 
+REFUND_LIMIT_CENTS = 10_000
+APPROVED_DESTINATIONS = ("support-inbox",)
+
+
+def tool_permissions():
+    return [
+        {
+            "tool": "documents.read",
+            "permission": "Read scoped documents",
+            "scope": sorted(DOCUMENTS),
+            "approval": "Not required within scope",
+        },
+        {
+            "tool": "refunds.create",
+            "permission": "Create simulated refunds",
+            "scope": ["T-1001", "T-1002"],
+            "automatic_limit_cents": REFUND_LIMIT_CENTS,
+            "approval": "Human approval above $100 per request",
+        },
+        {
+            "tool": "messages.send",
+            "permission": "Send simulated support messages",
+            "scope": list(APPROVED_DESTINATIONS),
+            "approval": "Not required within scope",
+        },
+    ]
+
+
 def evaluate(call: ToolCall) -> Decision:
     if call.tool not in SCHEMAS:
         return Decision("denied", "tool.allowlist", "Tool is not registered.", "high")
@@ -54,9 +82,9 @@ def evaluate(call: ToolCall) -> Decision:
         return Decision(
             "denied", "documents.scope", "Document is outside support-agent scope.", "high"
         )
-    if call.tool == "messages.send" and call.arguments["destination"] != "support-inbox":
+    if call.tool == "messages.send" and call.arguments["destination"] not in APPROVED_DESTINATIONS:
         return Decision("denied", "messages.destination", "Destination is not approved.", "high")
-    if call.tool == "refunds.create" and call.arguments["amount_cents"] > 10_000:
+    if call.tool == "refunds.create" and call.arguments["amount_cents"] > REFUND_LIMIT_CENTS:
         return Decision(
             "pending", "refunds.approval", "Refund exceeds $100; review required.", "medium"
         )

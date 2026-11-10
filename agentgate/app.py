@@ -4,6 +4,7 @@ import os
 import secrets
 from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -14,6 +15,8 @@ from pydantic import ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .policy import StrictModel, ToolCall
+from .profile import ProfileUpdate
+from .scenarios import scenario, scenarios
 from .store import Store
 
 bearer = HTTPBearer(auto_error=False)
@@ -96,6 +99,45 @@ def create_app(db_path=None, agent_token=None, reviewer_token=None):
             raise HTTPException(404, "Action not found") from None
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from None
+
+    @app.get("/api/agent", dependencies=[reviewer_auth])
+    def agent_profile():
+        return store.profile()
+
+    @app.put("/api/agent", dependencies=[reviewer_auth])
+    def update_agent_profile(update: ProfileUpdate):
+        try:
+            return store.update_profile(update)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+
+    @app.get("/api/demo/scenarios", dependencies=[reviewer_auth])
+    def demo_scenarios():
+        return scenarios()
+
+    @app.post(
+        "/api/demo/scenarios/{scenario_id}/run", dependencies=[reviewer_auth], status_code=201
+    )
+    async def run_scenario(scenario_id: str, request: Request):
+        # No caller-supplied tools/arguments or identities at this reviewer-only boundary.
+        if await request.body():
+            raise HTTPException(422, "Scenario runs do not accept a request body")
+        selected = scenario(scenario_id)
+        if selected is None:
+            raise HTTPException(404, "Scenario not found")
+        action = store.submit(
+            ToolCall(
+                run_id=f"demo-{selected['id']}-{uuid4().hex[:8]}",
+                tool=selected["tool"],
+                arguments=selected["arguments"],
+            )
+        )
+        return {
+            "scenario_id": scenario_id,
+            "expected": selected["expected"],
+            "matched": action["outcome"] == selected["expected"],
+            "action": action,
+        }
 
     @app.get("/", include_in_schema=False)
     def index():

