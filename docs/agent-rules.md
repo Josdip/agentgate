@@ -42,6 +42,8 @@ The history view shows the latest 20 revisions; all historical snapshots remain 
 
 On first startup, AgentGate adds `agent_policies`, `policy_rules`, and `policy_history`, seeds each agent with its original defaults, and adds nullable `policy_revision`/`matched_rule_id` action columns. Existing actions and profile metadata remain. An existing policy is never reseeded on restart, including when all its rules have been deleted.
 
+Use a separate database or backup for comparisons with older branches: pre-Rules application code does not read these stored policies and must not be used to enforce custom rule settings. This migration is not an automatic downgrade mechanism.
+
 Older actions retain unknown policy provenance. A legacy pending request without a policy revision cannot be approved after this upgrade; reject it and submit it again. Tokens and dependencies are unchanged.
 
 Stop your old server, switch to the task branch, and restart to load the new API:
