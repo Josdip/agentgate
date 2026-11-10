@@ -24,7 +24,7 @@ def main():
     if not token:
         raise SystemExit("Start python -m agentgate first to create local credentials.")
     run_id = f"demo-{uuid4().hex[:8]}"
-    for item in scenarios():
+    for item in scenarios("support-agent"):
         label, tool, arguments, expected = (
             item[key] for key in ("name", "tool", "arguments", "expected")
         )

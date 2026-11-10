@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from .policy import SCHEMAS, ToolCall, evaluate, execute, tool_permissions
 from .profile import ProfileUpdate
+from .registry import AGENTS
 
 
 class Store:
@@ -29,34 +30,42 @@ class Store:
                 agent_id TEXT NOT NULL, revision INTEGER NOT NULL, changed_at TEXT NOT NULL,
                 changed_by TEXT NOT NULL, metadata TEXT NOT NULL,
                 PRIMARY KEY (agent_id, revision))""")
+            for column in ("agent_id", "outcome", "risk"):
+                db.execute(f"CREATE INDEX IF NOT EXISTS actions_{column} ON actions({column})")
             now = datetime.now(UTC).isoformat()
-            metadata = json.dumps(
-                {
-                    "display_name": "Support agent",
-                    "description": "Synthetic customer-support agent governed by AgentGate.",
-                    "model_connections": [],
-                }
-            )
-            cursor = db.execute(
-                "INSERT OR IGNORE INTO agent_profiles VALUES (?,?,?,?,?)",
-                ("support-agent", now, now, 1, metadata),
-            )
-            if cursor.rowcount:
-                db.execute(
-                    "INSERT INTO profile_history VALUES (?,?,?,?,?)",
-                    ("support-agent", 1, now, "system", metadata),
+            for agent_id, config in AGENTS.items():
+                metadata = json.dumps(
+                    {
+                        "display_name": config["name"],
+                        "description": config["description"],
+                        "model_connections": [],
+                    }
                 )
+                cursor = db.execute(
+                    "INSERT OR IGNORE INTO agent_profiles VALUES (?,?,?,?,?)",
+                    (agent_id, now, now, 1, metadata),
+                )
+                if cursor.rowcount:
+                    db.execute(
+                        "INSERT INTO profile_history VALUES (?,?,?,?,?)",
+                        (agent_id, 1, now, "system", metadata),
+                    )
 
-    def profile(self):
+    def profile(self, agent_id="support-agent"):
+        if agent_id not in AGENTS:
+            raise KeyError(agent_id)
         with self.connection() as db:
             row = db.execute(
-                "SELECT * FROM agent_profiles WHERE agent_id='support-agent'"
+                "SELECT * FROM agent_profiles WHERE agent_id=?", (agent_id,)
             ).fetchone()
             profile = dict(row)
             profile.update(json.loads(profile.pop("metadata")))
             for connection in profile["model_connections"]:
                 connection["verification"] = "unverified"
-            profile["tools"] = tool_permissions()
+            profile["tools"] = tool_permissions(agent_id)
+            profile["location"] = AGENTS[agent_id]["location"]
+            profile["owner"] = AGENTS[agent_id]["owner"]
+            profile["connection_status"] = "simulated demo"
             profile["permissions"] = {
                 "identity_source": "server-owned agent credential",
                 "unknown_tools": "denied",
@@ -65,38 +74,46 @@ class Store:
                 "execution_mode": "synthetic",
             }
             profile["activity"] = dict(
-                db.execute("""SELECT COUNT(*) AS total_actions,
+                db.execute(
+                    """SELECT COUNT(*) AS total_actions,
                 COALESCE(SUM(outcome='denied'),0) AS denied,
                 COALESCE(SUM(outcome='pending'),0) AS pending,
                 COALESCE(SUM(outcome='executed'),0) AS executed,
                 MIN(created_at) AS first_seen, MAX(created_at) AS last_seen
-                FROM actions WHERE agent_id='support-agent'""").fetchone()
+                FROM actions WHERE agent_id=?""",
+                    (agent_id,),
+                ).fetchone()
             )
             profile["history"] = [
                 {**dict(item), "metadata": json.loads(item["metadata"])}
-                for item in db.execute("""SELECT revision,changed_at,changed_by,metadata
-                    FROM profile_history WHERE agent_id='support-agent'
-                    ORDER BY revision DESC LIMIT 20""")
+                for item in db.execute(
+                    """SELECT revision,changed_at,changed_by,metadata
+                    FROM profile_history WHERE agent_id=?
+                    ORDER BY revision DESC LIMIT 20""",
+                    (agent_id,),
+                )
             ]
             return profile
 
-    def update_profile(self, update: ProfileUpdate):
+    def update_profile(self, update: ProfileUpdate, agent_id="support-agent"):
+        if agent_id not in AGENTS:
+            raise KeyError(agent_id)
         metadata = update.model_dump(exclude={"revision"})
         now = datetime.now(UTC).isoformat()
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             cursor = db.execute(
                 """UPDATE agent_profiles SET revision=revision+1,
-                updated_at=?,metadata=? WHERE agent_id='support-agent' AND revision=?""",
-                (now, json.dumps(metadata), update.revision),
+                updated_at=?,metadata=? WHERE agent_id=? AND revision=?""",
+                (now, json.dumps(metadata), agent_id, update.revision),
             )
             if not cursor.rowcount:
                 raise ValueError("Profile changed; reload before saving again.")
             db.execute(
                 "INSERT INTO profile_history VALUES (?,?,?,?,?)",
-                ("support-agent", update.revision + 1, now, "local-reviewer", json.dumps(metadata)),
+                (agent_id, update.revision + 1, now, "local-reviewer", json.dumps(metadata)),
             )
-        return self.profile()
+        return self.profile(agent_id)
 
     @contextmanager
     def connection(self):
@@ -115,8 +132,10 @@ class Store:
         item["result"] = json.loads(item["result"]) if item["result"] else None
         return item
 
-    def submit(self, call: ToolCall):
-        decision = evaluate(call)
+    def submit(self, call: ToolCall, agent_id="support-agent"):
+        if agent_id not in AGENTS:
+            raise KeyError(agent_id)
+        decision = evaluate(call, agent_id)
         action_id = str(uuid4())
         # Do not persist message bodies; governance metadata is sufficient for the demo.
         metadata = (
@@ -134,7 +153,7 @@ class Store:
                 (
                     action_id,
                     datetime.now(UTC).isoformat(),
-                    "support-agent",
+                    agent_id,
                     call.run_id,
                     call.tool,
                     json.dumps(metadata),
@@ -160,6 +179,57 @@ class Store:
                 self.decode(row)
                 for row in db.execute("SELECT * FROM actions ORDER BY created_at DESC LIMIT 200")
             ]
+
+    def directory(self):
+        return [self.profile(agent_id) for agent_id in AGENTS]
+
+    def overview(self):
+        with self.connection() as db:
+            summary = dict(
+                db.execute("""SELECT COUNT(*) AS total,
+                COALESCE(SUM(outcome='pending'),0) AS pending,
+                COALESCE(SUM(outcome='denied'),0) AS denied,
+                COALESCE(SUM(outcome='executed'),0) AS executed
+                FROM actions""").fetchone()
+            )
+            summary["agents"] = len(AGENTS)
+            summary["recent"] = [
+                self.decode(row)
+                for row in db.execute("SELECT * FROM actions ORDER BY rowid DESC LIMIT 3")
+            ]
+            return summary
+
+    def activity(self, *, agent_id=None, outcome=None, risk=None, search="", before=None, limit=20):
+        clauses, values = [], []
+        for column, value in (("agent_id", agent_id), ("outcome", outcome), ("risk", risk)):
+            if value:
+                clauses.append(f"{column}=?")
+                values.append(value)
+        if search:
+            clauses.append(
+                "(tool LIKE ? ESCAPE '\\' OR run_id LIKE ? ESCAPE '\\' OR reason LIKE ? ESCAPE '\\')"
+            )
+            term = "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            values.extend([term] * 3)
+        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        with self.connection() as db:
+            total = db.execute("SELECT COUNT(*) FROM actions" + where, values).fetchone()[0]
+            page_clauses = clauses + (["rowid < ?"] if before is not None else [])
+            page_values = values + ([before] if before is not None else [])
+            page_where = " WHERE " + " AND ".join(page_clauses) if page_clauses else ""
+            rows = db.execute(
+                "SELECT rowid AS cursor,* FROM actions"
+                + page_where
+                + " ORDER BY rowid DESC LIMIT ?",
+                [*page_values, limit + 1],
+            ).fetchall()
+            has_more = len(rows) > limit
+            items = [self.decode(row) for row in rows[:limit]]
+            return {
+                "items": items,
+                "total": total,
+                "next_cursor": items[-1]["cursor"] if has_more else None,
+            }
 
     def review(self, action_id: str, approve: bool):
         with self.connection() as db:

@@ -33,7 +33,7 @@ def update(revision=1):
 
 
 def test_each_of_exactly_six_scenarios_creates_one_action(client):
-    listed = client.get("/api/demo/scenarios", headers=auth()).json()
+    listed = client.get("/api/demo/scenarios?agent_id=support-agent", headers=auth()).json()
     assert len(listed) == 6
     assert len({item["id"] for item in listed}) == 6
     for index, item in enumerate(listed, 1):
