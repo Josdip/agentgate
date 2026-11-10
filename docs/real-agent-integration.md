@@ -31,7 +31,7 @@ Start AgentGate normally, connect the reviewer dashboard, then in another termin
 .venv/bin/python examples/real_agent_demo.py
 ```
 
-The unmodified scaffold prints **NOT CONNECTED** and makes no requests. Once implemented and marked ready, it reads the agent token from the environment or local `.env`, assigns a unique `showcase-...` run ID, and submits tool calls. Dashboard activity/profile totals pick up those calls through existing polling. The server still attributes this integration to `support-agent`; distinct real-agent identities require the planned registry/credential work.
+The unmodified scaffold prints **NOT CONNECTED** and makes no requests. Once implemented and marked ready, it reads the agent token from the environment or local `.env`, assigns a unique `showcase-...` run ID, and submits tool calls. Dashboard activity/profile totals pick up those calls through existing polling. The server still attributes this integration to `support-agent`; Sales and Finance integrations can use their separately configured agent credentials; see [the multi-agent guide](navigation-and-agents.md).
 
 The client accepts loopback gateway URLs only and refuses HTTP redirects. The example limits runs to six tool proposals. A denied proposal is returned as a denied observation, never run locally. A pending approval stops the run; inspect and approve/reject it in the dashboard. No automatic resume exists yet. Transport failures stop the agent instead of bypassing the gateway. Add provider token/cost/time budgets before enabling a real model loop; the step limit bounds gateway submissions only.
 

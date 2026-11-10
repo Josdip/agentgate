@@ -36,3 +36,11 @@ Recorded the SMB product destination: a named multi-agent directory across cloud
 Added a clearly unconnected dashboard showcase area, a replaceable `ShowcaseAgent` adapter, and a loopback-only gateway client/run loop. The disabled scaffold makes no requests. Real integrations must route tool proposals through policy; pending approval pauses the loop and connection failures stop it. No provider dependency, credentials, live model, process launcher, or discovery claim was added.
 
 Validation: 47 automated tests pass; the existing upstream TestClient deprecation warning remains. Browser verification confirmed the unconnected showcase panel and expandable implementation guidance. The temporary port-8011 server was stopped afterward. A preview is saved in `docs/images/real-agent-placeholder.png`.
+
+## Dedicated product pages and three-agent demo
+
+Moved inventory/profiles to `/agents` and `/agents/{id}` and all decisions to `/activity`. The overview is bounded to three recent actions with summary totals and review shortcuts. Activity now uses SQL filters, cursor pagination, and a 20-record UI page, with paused polling on older pages.
+
+Added Sales and Finance demo identities, independent profiles/history, credential-bound API identity, scoped tools, and eight additional scenarios (fourteen total). Existing Support data and metadata survive startup. Locations are explicitly simulated; no new discovery or LLM connection is claimed.
+
+Validation: 55 automated tests pass, including a 1,001-record cursor traversal with a concurrent arrival. Browser checks verified new cases, finance approval, dedicated pages, 20-row paging, and filtered results. The temporary port-8011 QA server was stopped. New guides and screenshots document the product flow and compatibility endpoints.

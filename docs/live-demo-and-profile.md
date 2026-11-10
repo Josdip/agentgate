@@ -1,5 +1,7 @@
 # Live dashboard demo and agent profile
 
+For the latest three-agent navigation and fourteen-case behavior, see [navigation and multi-agent demos](navigation-and-agents.md). The sections below describe the original Support cases and the shared profile editor. Inventory is now on its own page; approvals are on Activity & decisions.
+
 ## Update an existing clone
 
 Stop the old server with Ctrl+C, then run from your clone:

@@ -43,3 +43,7 @@ Profile updates allow metadata only and cannot grant tool permissions or set ver
 ## Future real-agent adapter scaffold
 
 The scaffold is disabled by default and makes no provider/gateway calls. Its local client refuses non-loopback URLs and redirects, sends only the agent credential, returns denied results to the adapter, pauses on pending approvals, and stops on transport errors. Real adapters must not execute tools directly or receive reviewer credentials. The proposed step limit does not bound model token usage or costs; provider budgets/timeouts are required when implementing the adapter. The current showcase slot is static guidance rather than proof of a live integration.
+
+## Multiple demo identities
+
+Sales, Finance, and Support have separate server-owned permission scopes. Optional distinct Sales/Finance credentials bind external calls to those identities; caller-supplied identity remains invalid. Reviewer demos are fixed to the catalog's identity. Profile edits cannot change tools, scopes, deployment claims, or credentials. Finance payments are synthetic and require separate reviewer approval above $500. Scoping and pagination protect the product flow, but this remains one synthetic business rather than tenant isolation.

@@ -4,11 +4,15 @@ Product direction: [simple, evidence-based agent oversight for small and medium 
 
 ## Delivered: local governance foundation
 
-Deterministic policy, agent/reviewer credentials, persistent audit, one-time approvals, six individually runnable dashboard cases, auto-refresh, single-agent profile, versioned declared model inventory, and policy-derived tool permissions. Tools remain synthetic. A real-agent adapter scaffold is available; no model integration is connected by default.
+Deterministic policy, agent/reviewer credentials, persistent audit, one-time approvals, six individually runnable dashboard cases, auto-refresh, three seeded agent profiles, versioned declared model inventory, and policy-derived tool permissions. Tools remain synthetic. A real-agent adapter scaffold is available; no model integration is connected by default.
 
-## Next: multi-agent business view
+## Delivered: initial multi-agent business view
 
-Create an actual agent registry with stable IDs, names, purpose, owner, cloud/endpoint/browser location, and reporting freshness. Add a company overview showing known/active agents and coverage gaps. Bind credentials to individual agents before accepting multi-agent events; never trust caller-supplied identity. Scope profiles and activity per agent and retain the existing support-agent demo data.
+Dedicated inventory/profile pages, an overview limited to three recent actions, and a separate server-filtered paginated activity page. Support, Sales, and Finance have distinct effective permissions, versioned metadata, and fourteen total demo cases. Optional credentials bind direct API calls to their registered identities. Deployment locations remain simulated.
+
+## Next: broader registry and business workflows
+
+Extend the seeded registry with onboarding, lifecycle management, verified cloud/endpoint/browser sources, and reporting freshness. Add a company overview showing known/active agents and coverage gaps. Bind credentials to individual agents before accepting multi-agent events; never trust caller-supplied identity. Scope profiles and activity per agent and retain the existing support-agent demo data.
 
 Show configured tool/model connections separately from verified and observed usage. Translate activity into concise business language with technical evidence available on demand. Add a “Needs attention” workflow for consequential decisions.
 

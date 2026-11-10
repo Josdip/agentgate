@@ -64,3 +64,5 @@ GitHub browser sign-in and the connected GitHub app are separate from terminal G
 - **Empty dashboard:** connect with the reviewer credential, run the demo, and refresh.
 
 For a future model-driven showcase, start with [the real-agent integration scaffold](real-agent-integration.md). Its unconfigured default safely prints setup guidance without making requests.
+
+The latest [navigation and multi-agent guide](navigation-and-agents.md) covers the three product pages, fourteen dashboard cases, paginated queries, and optional Sales/Finance credentials. Existing `.env` and audit data remain valid.

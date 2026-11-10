@@ -4,25 +4,30 @@
 
 **Observe AI agent tool calls. Enforce policy. Review sensitive actions.**
 
-AgentGate is a local security gateway for a synthetic customer-support agent. It controls tool execution, records policy decisions, and gives a human reviewer a dashboard for approving sensitive requests.
+AgentGate is a local security gateway for synthetic Support, Sales, and Finance agents. It controls tool execution, records policy decisions, and gives a human reviewer a dashboard for approving sensitive requests.
 
 **Status:** working portfolio prototype. Business data and tool effects are synthetic. The demo is scripted; no LLM or paid provider account is required.
 
 ## Product direction
 
-AgentGate aims to help small and medium businesses understand which agents they have, where those agents run, what they can access, what they are doing, and what needs attention. The planned risk view separates configured exposure from observed behavior. See [the product direction](docs/product-direction.md) and [roadmap](docs/roadmap.md); multi-agent discovery and risk assessment are future work.
+AgentGate aims to help small and medium businesses understand which agents they have, where those agents run, what they can access, what they are doing, and what needs attention. The planned risk view separates configured exposure from observed behavior. See [the product direction](docs/product-direction.md) and [roadmap](docs/roadmap.md); automatic discovery and company-level risk assessment are future work.
 
 ## Live dashboard and agent profile
 
-Run each of the six cases individually from the dashboard and watch its policy result appear. Activity updates every three seconds. Maintain a persistent agent profile with versioned model inventory, lifetime activity, and tool permissions derived from the enforced policy. Registered models are labeled unverified until real integrations exist.
+Run fourteen cases across three agents individually from the dashboard and watch its policy result appear. Activity updates every three seconds. Maintain persistent per-agent profiles with versioned model inventory, lifetime activity, and tool permissions derived from the enforced policy. Registered models are labeled unverified until real integrations exist.
 
 See [the interactive demo and profile guide](docs/live-demo-and-profile.md) for usage and existing-clone update instructions.
+
+## Product pages
+
+The overview stays focused on totals, demos, and three recent actions. [Agent inventory](http://127.0.0.1:8000/agents) has its own page. [Activity & decisions](http://127.0.0.1:8000/activity) provides server-side filters and cursor pagination with 20 actions per page. See [navigation and multi-agent demos](docs/navigation-and-agents.md) for the latest behavior and upgrade steps.
 
 ## What you can demonstrate
 
 - A scoped document read and $25 refund execute successfully.
 - A $250 refund waits for human approval.
 - An unauthorized document, unapproved destination, and unknown tool are denied.
+- Sales can read assigned leads but cannot issue refunds; Finance can read invoices and request supplier payments.
 - A reviewer sees the rule, explanation, request metadata, and outcome.
 - Agent credentials cannot approve actions; concurrent or repeated reviews cannot execute a refund twice.
 
@@ -37,7 +42,7 @@ python3 -m venv .venv
 .venv/bin/python -m agentgate
 ```
 
-Connect in the dashboard and click **Run scenario** on any of the six cards. The CLI demo is also available in another terminal:
+Connect in the dashboard and click **Run scenario** on any case for the selected agent. The CLI demo is also available in another terminal:
 
 ```bash
 .venv/bin/python examples/demo.py
@@ -67,12 +72,13 @@ The gateway assigns identity from credentials and validates strict tool schemas 
 make check
 ```
 
-Tests cover authorization boundaries, malformed arguments, refund thresholds, default-deny behavior, persistence, privacy redaction, and approval replay/concurrency. The six-scenario demo checks its HTTP outcomes automatically.
+Tests cover authorization boundaries, malformed arguments, refund thresholds, default-deny behavior, persistence, privacy redaction, and approval replay/concurrency. The batch CLI checks its original six Support-agent outcomes; automated tests cover all fourteen dashboard cases.
 
 ## Documentation
 
 | Guide | Contents |
 |---|---|
+| [Navigation & multi-agent demos](docs/navigation-and-agents.md) | Dedicated pages, bounded activity browsing, agent policies, update guide |
 | [Product direction](docs/product-direction.md) | Business goals, agent coverage, understandable activity, explainable risk |
 | [Real-agent scaffold](docs/real-agent-integration.md) | Placeholder and adapter contract for future genuine agent demos |
 | [Live demo & profile](docs/live-demo-and-profile.md) | Individual scenarios, profile editing, model inventory, upgrade guide |
