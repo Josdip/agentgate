@@ -70,3 +70,5 @@ The latest [navigation and multi-agent guide](navigation-and-agents.md) covers t
 ## Interface checks
 
 The [readable-interface pass](interface-redesign.md) documents browser checks and visual review. With Node.js 18+ installed, `make check-interface` runs dependency-free UI state regression tests. No npm install is needed. The application and existing `make check` remain Python-only. GitHub CI runs both suites.
+
+The [agent rules guide](agent-rules.md) describes saved permissions, the Rules editor, schema migration, policy revisions, and stale/legacy approval behavior. Restart the server for the new endpoints; existing tokens remain valid.

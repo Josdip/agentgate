@@ -47,3 +47,9 @@ The scaffold is disabled by default and makes no provider/gateway calls. Its loc
 ## Multiple demo identities
 
 Sales, Finance, and Support have separate server-owned permission scopes. Optional distinct Sales/Finance credentials bind external calls to those identities; caller-supplied identity remains invalid. Reviewer demos are fixed to the catalog's identity. Profile edits cannot change tools, scopes, deployment claims, or credentials. Finance payments are synthetic and require separate reviewer approval above $500. Scoping and pagination protect the product flow, but this remains one synthetic business rather than tenant isolation.
+
+## Editable per-agent rules
+
+The privileged reviewer can now change active tool permissions through strict structured schemas. These changes are separate from profile metadata. Agents cannot read or mutate policy endpoints, use rule bodies to choose identity, disable schema validation, register executable tools, or approve themselves. Exact targets, finite schemas, and one rule per tool keep decisions deterministic; deletion fails closed and is not undone by restart.
+
+Every rule change records a revision snapshot, and actions record the evaluation revision/rule ID. Rule writes, submissions, and approvals serialize through SQLite write transactions. Approval fails when that agent's policy revision changed or when legacy provenance is unknown; rejection and resubmission are required. The reviewer role is trusted to expand access intentionally. Production separation of policy administrators/reviewers, individual identities, protected audit storage, and real-side-effect recovery remain future work. See the concrete bypass and concurrency cases in `tests/test_rules.py`.
