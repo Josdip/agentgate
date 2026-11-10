@@ -10,6 +10,11 @@
 <div class="section-heading"><div><div class="eyebrow">INTERACTIVE DEMO</div><h2 id="demo-title">Run one scenario at a time</h2><p>Six synthetic cases. Each request passes through the real gateway policy.</p></div><span class="environment" id="live-state">CONNECT TO BEGIN</span></div>
 <div id="scenarios" class="scenario-grid"><div class="empty">Connect with your reviewer token to run scenarios here.</div></div>
 </section>
+<section class="integration-panel" aria-labelledby="integration-title">
+<div class="section-heading"><div><div class="eyebrow">REAL AGENT SHOWCASE</div><h2 id="integration-title">Connect your first real agent</h2><p>A dedicated place to add a model-driven demo as the product grows.</p></div><span class="badge pending">Not connected</span></div>
+<p class="help">The six cases above are scripted. This integration slot is a scaffold; it has no live model, provider credentials, or agent process attached.</p>
+<details><summary>How to plug in an agent</summary><ol class="integration-steps"><li>Implement your model or framework adapter in <code>examples/real_agent_demo.py</code>.</li><li>Return proposed tool calls through <code>agentgate.client.GatewayClient</code>. AgentGate evaluates and executes them.</li><li>Run the adapter locally and watch its actions appear in the activity feed. Refunds requiring approval pause for your decision.</li></ol><p class="help">This slot does not launch code from the browser. Its label describes scaffold readiness, not live connection monitoring. Model inventory entries are maintained separately.</p><pre>.venv/bin/python examples/real_agent_demo.py</pre></details>
+</section>
 <section class="profile-panel" aria-labelledby="profile-title"><div class="section-heading"><div><div class="eyebrow">AGENT INVENTORY</div><h2 id="profile-title">Ongoing agent profile</h2><p>Persistent inventory, enforced permissions, and lifetime activity.</p></div></div>
 <div id="profile-summary" class="empty">Connect to load this agent’s profile.</div>
 <details id="profile-editor" hidden><summary>Edit profile & model inventory</summary>

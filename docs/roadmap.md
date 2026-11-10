@@ -1,17 +1,31 @@
 # Roadmap
 
-## Milestone 1: local security gateway
+Product direction: [simple, evidence-based agent oversight for small and medium businesses](product-direction.md).
 
-Deterministic tool policy, server-owned agent identity, SQLite audit records, human approvals, synthetic tools, dashboard, repeatable demo, and security regression tests.
+## Delivered: local governance foundation
 
-## Milestone 2: agent integration
+Deterministic policy, agent/reviewer credentials, persistent audit, one-time approvals, six individually runnable dashboard cases, auto-refresh, single-agent profile, versioned declared model inventory, and policy-derived tool permissions. Tools remain synthetic. A real-agent adapter scaffold is available; no model integration is connected by default.
 
-Add an actual model-driven support agent using an optional provider key. Demonstrate a malicious instruction embedded in an untrusted document. Measure allowed/blocked outcomes and false positives on a versioned scenario set. Never claim that blocking a destination detects all prompt injections.
+## Next: multi-agent business view
 
-## Milestone 3: service hardening
+Create an actual agent registry with stable IDs, names, purpose, owner, cloud/endpoint/browser location, and reporting freshness. Add a company overview showing known/active agents and coverage gaps. Bind credentials to individual agents before accepting multi-agent events; never trust caller-supplied identity. Scope profiles and activity per agent and retain the existing support-agent demo data.
 
-PostgreSQL migrations, tenant isolation, OIDC/RBAC, scoped short-lived credentials, approval expiry, retention controls, rate limits, deployment and backups. Support idempotency keys and transactional outbox processing before adding real external side effects.
+Show configured tool/model connections separately from verified and observed usage. Translate activity into concise business language with technical evidence available on demand. Add a “Needs attention” workflow for consequential decisions.
 
-## Milestone 4: portfolio release
+## Next: explainable risk
 
-Publish reproducible evaluation results, screenshots, a short walkthrough, and a resume description backed by measured outcomes. Document deployment costs and remaining limitations.
+Assess configured exposure and observed behavior separately. Use Low/Medium/High/Unknown with explanations, timestamps, source coverage, and suggested actions. Persist versioned assessment inputs/results; distinguish blocked attempts from completed actions. Add scenario-based evaluation of risk labels and false positives. No telemetry must not imply safety.
+
+## Real-agent showcase integration
+
+Implement `ShowcaseAgent.next_action` in `examples/real_agent_demo.py`, configure a provider outside the browser, and route tool proposals through `GatewayClient`. Begin with one real support agent and synthetic tools. Demonstrate malicious instructions in retrieved content and record actual observed outcomes. Evaluate realistic boundaries without claiming universal prompt-injection detection.
+
+The dashboard integration area is a placeholder with setup guidance, not a process launcher or connection monitor. See [the integration guide](real-agent-integration.md).
+
+## Broader deployment coverage
+
+Add a cloud connector, then endpoint and browser reporting incrementally. For each source, document discovery prerequisites, stable identity mapping, deduplication, permission requirements, telemetry freshness, and observation versus enforcement capabilities. Do not imply complete company discovery from gateway traffic alone.
+
+## Service hardening and product validation
+
+Tenant isolation, PostgreSQL migrations, OIDC/RBAC, scoped short-lived credentials, approval expiry, retention controls, rate limits, deployment and backups. Add idempotency and durable external-side-effect processing before real business tools. Validate onboarding and business terminology with prospective SMB users; publish reproducible evaluation results and an honest portfolio walkthrough.

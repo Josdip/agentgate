@@ -62,3 +62,5 @@ GitHub browser sign-in and the connected GitHub app are separate from terminal G
 - **Port 8000 in use:** stop the previous local instance before restarting.
 - **Tests stall only in a restricted runner:** run in a context that permits local async/thread operations; the full API suite uses FastAPI's TestClient.
 - **Empty dashboard:** connect with the reviewer credential, run the demo, and refresh.
+
+For a future model-driven showcase, start with [the real-agent integration scaffold](real-agent-integration.md). Its unconfigured default safely prints setup guidance without making requests.

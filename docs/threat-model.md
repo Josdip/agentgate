@@ -39,3 +39,7 @@ Use only synthetic data and simulated tools. Keep the server bound to `127.0.0.1
 The reviewer can now trigger six predefined synthetic scenarios. Those endpoints accept no tool parameters or identities from the browser; unknown scenario IDs and request bodies are rejected. The agent credential cannot run reviewer demo endpoints, read profile metadata, or edit inventory. Refund approval remains a separate operation.
 
 Profile updates allow metadata only and cannot grant tool permissions or set verification state. A revision precondition prevents concurrent edits from silently overwriting each other. Profile history retains past values, including removed model entries. Provider/model names are unverified declarations: do not infer an active LLM connection or automatic discovery. No credentials are collected by the inventory form.
+
+## Future real-agent adapter scaffold
+
+The scaffold is disabled by default and makes no provider/gateway calls. Its local client refuses non-loopback URLs and redirects, sends only the agent credential, returns denied results to the adapter, pauses on pending approvals, and stops on transport errors. Real adapters must not execute tools directly or receive reviewer credentials. The proposed step limit does not bound model token usage or costs; provider budgets/timeouts are required when implementing the adapter. The current showcase slot is static guidance rather than proof of a live integration.

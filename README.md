@@ -8,6 +8,10 @@ AgentGate is a local security gateway for a synthetic customer-support agent. It
 
 **Status:** working portfolio prototype. Business data and tool effects are synthetic. The demo is scripted; no LLM or paid provider account is required.
 
+## Product direction
+
+AgentGate aims to help small and medium businesses understand which agents they have, where those agents run, what they can access, what they are doing, and what needs attention. The planned risk view separates configured exposure from observed behavior. See [the product direction](docs/product-direction.md) and [roadmap](docs/roadmap.md); multi-agent discovery and risk assessment are future work.
+
 ## Live dashboard and agent profile
 
 Run each of the six cases individually from the dashboard and watch its policy result appear. Activity updates every three seconds. Maintain a persistent agent profile with versioned model inventory, lifetime activity, and tool permissions derived from the enforced policy. Registered models are labeled unverified until real integrations exist.
@@ -69,6 +73,8 @@ Tests cover authorization boundaries, malformed arguments, refund thresholds, de
 
 | Guide | Contents |
 |---|---|
+| [Product direction](docs/product-direction.md) | Business goals, agent coverage, understandable activity, explainable risk |
+| [Real-agent scaffold](docs/real-agent-integration.md) | Placeholder and adapter contract for future genuine agent demos |
 | [Live demo & profile](docs/live-demo-and-profile.md) | Individual scenarios, profile editing, model inventory, upgrade guide |
 | [Development](docs/development.md) | Setup, demo, configuration, checks, Git workflow, troubleshooting |
 | [Architecture](docs/architecture.md) | Components, request lifecycle, policy table, API, state, privacy |
