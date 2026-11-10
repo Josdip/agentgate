@@ -44,3 +44,9 @@ Moved inventory/profiles to `/agents` and `/agents/{id}` and all decisions to `/
 Added Sales and Finance demo identities, independent profiles/history, credential-bound API identity, scoped tools, and eight additional scenarios (fourteen total). Existing Support data and metadata survive startup. Locations are explicitly simulated; no new discovery or LLM connection is claimed.
 
 Validation: 55 automated tests pass, including a 1,001-record cursor traversal with a concurrent arrival. Browser checks verified new cases, finance approval, dedicated pages, 20-row paging, and filtered results. The temporary port-8011 QA server was stopped. New guides and screenshots document the product flow and compatibility endpoints.
+
+## Readable interface pass — November 10, 2026
+
+On `codex/readable-interface`, implemented the owner's original light-workspace direction with readable type, action-first overview, comparable agent rows, explicit decision/review context, and responsive layouts. No backend/API/authorization changes or new security capability claims were introduced. Added loading/unavailable/stale guidance and context-preserving rendering, with session guards for disconnect races.
+
+Verification: 55 Python tests and five dependency-free JavaScript state tests pass, with the existing upstream TestClient warning. Desktop/mobile browser checks covered all fourteen demos, approval/rejection, profiles, search/pagination, keyboard focus, polling preservation, and server-failure feedback. Contrast values and native-zoom verification limits are recorded in `docs/interface-redesign.md`. Screenshots use disposable QA records; the temporary server was stopped.

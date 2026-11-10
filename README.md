@@ -18,6 +18,10 @@ Run fourteen cases across three agents individually from the dashboard and watch
 
 See [the interactive demo and profile guide](docs/live-demo-and-profile.md) for usage and existing-clone update instructions.
 
+## Readable interface
+
+The light workspace redesign is documented in [interface redesign and verification](docs/interface-redesign.md), including desktop/mobile previews, interaction checks, and accessibility limits. Backend API and approval behavior remain unchanged.
+
 ## Product pages
 
 The overview stays focused on totals, demos, and three recent actions. [Agent inventory](http://127.0.0.1:8000/agents) has its own page. [Activity & decisions](http://127.0.0.1:8000/activity) provides server-side filters and cursor pagination with 20 actions per page. See [navigation and multi-agent demos](docs/navigation-and-agents.md) for the latest behavior and upgrade steps.
@@ -75,6 +79,9 @@ make check
 Tests cover authorization boundaries, malformed arguments, refund thresholds, default-deny behavior, persistence, privacy redaction, and approval replay/concurrency. The batch CLI checks its original six Support-agent outcomes; automated tests cover all fourteen dashboard cases.
 
 ## Documentation
+
+For project work in Codex, see the [coding assistant workflow](docs/coding-agent-workflow.md)
+and repository instructions in [AGENTS.md](AGENTS.md).
 
 | Guide | Contents |
 |---|---|

@@ -66,3 +66,7 @@ GitHub browser sign-in and the connected GitHub app are separate from terminal G
 For a future model-driven showcase, start with [the real-agent integration scaffold](real-agent-integration.md). Its unconfigured default safely prints setup guidance without making requests.
 
 The latest [navigation and multi-agent guide](navigation-and-agents.md) covers the three product pages, fourteen dashboard cases, paginated queries, and optional Sales/Finance credentials. Existing `.env` and audit data remain valid.
+
+## Interface checks
+
+The [readable-interface pass](interface-redesign.md) documents browser checks and visual review. With Node.js 18+ installed, `make check-interface` runs dependency-free UI state regression tests. No npm install is needed. The application and existing `make check` remain Python-only. GitHub CI runs both suites.

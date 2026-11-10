@@ -19,3 +19,5 @@ jobs:
       - run: ruff check agentgate tests examples
       - run: ruff format --check agentgate tests examples
       - run: pytest -q
+      - name: Interface state regressions
+        run: node --test tests/interface.test.cjs
