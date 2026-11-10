@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
@@ -30,7 +31,13 @@ def create_app(db_path=None, agent_token=None, reviewer_token=None):
             "Configure distinct agent and reviewer tokens of at least 24 characters."
         )
     store = Store(db_path or os.environ.get("AGENTGATE_DB", "data/agentgate.db"))
-    app = FastAPI(title="AgentGate", version="0.1.0", description="Synthetic tool governance demo")
+    app = FastAPI(
+        title="AgentGate",
+        version="0.1.0",
+        description="Synthetic tool governance demo",
+        docs_url=None,
+        redoc_url=None,
+    )
     app.add_middleware(
         TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"]
     )
@@ -63,6 +70,7 @@ def create_app(db_path=None, agent_token=None, reviewer_token=None):
     agent_auth = Depends(require(agent_token))
     reviewer_auth = Depends(require(reviewer_token))
 
+    @app.exception_handler(RequestValidationError)
     @app.exception_handler(ValidationError)
     async def invalid_arguments(request, exc):
         # Avoid echoing potentially sensitive parameter values in validation errors.

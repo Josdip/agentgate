@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from .policy import ToolCall, evaluate, execute
+from .policy import SCHEMAS, ToolCall, evaluate, execute
 
 
 class Store:
@@ -42,7 +42,11 @@ class Store:
         decision = evaluate(call)
         action_id = str(uuid4())
         # Do not persist message bodies; governance metadata is sufficient for the demo.
-        metadata = dict(call.arguments)
+        metadata = (
+            dict(call.arguments)
+            if call.tool in SCHEMAS
+            else {"omitted": "Unregistered tool arguments are not stored."}
+        )
         if "message" in metadata:
             metadata["message"] = "[REDACTED]"
         with self.connection() as db:

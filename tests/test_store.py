@@ -59,3 +59,9 @@ def test_message_content_is_not_in_audit(tmp_path):
     assert action["outcome"] == "denied"
     assert action["result"] is None
     assert "secret-value" not in str(store.list())
+
+
+def test_unknown_tool_arguments_are_not_retained(tmp_path):
+    store = Store(str(tmp_path / "audit.db"))
+    store.submit(ToolCall(run_id="test", tool="unknown", arguments={"secret": "sensitive-value"}))
+    assert "sensitive-value" not in str(store.list())

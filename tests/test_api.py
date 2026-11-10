@@ -81,3 +81,9 @@ def test_unknown_review_and_extra_fields(client):
         ).status_code
         == 422
     )
+
+
+def test_invalid_body_does_not_echo_sensitive_input(client):
+    response = call(client, agent_id="synthetic-sensitive-value")
+    assert response.status_code == 422
+    assert "synthetic-sensitive-value" not in response.text
