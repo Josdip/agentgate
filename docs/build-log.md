@@ -18,3 +18,5 @@ No real agent framework, paid model provider, customer records, refunds, or exte
 - Browser smoke test loaded real audit records and approved the pending synthetic refund; counts changed from 2 to 3 executed and from 1 to 0 pending.
 - Saved the verified dashboard screenshot in `docs/images/dashboard.png`.
 - The current Starlette release emits a TestClient deprecation warning for its httpx adapter; tests still pass. Migrate the test adapter in a future dependency update.
+
+GitHub Actions passed on the pushed implementation: [initial CI run](https://github.com/Josdip/agentgate/actions/runs/42732454724). Local `main` tracks `origin/main`; project source and meaningful commit history are synchronized. Runtime credentials, virtual environment, and SQLite files are untracked.

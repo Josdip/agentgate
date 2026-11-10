@@ -1,5 +1,7 @@
 # AgentGate
 
+[![CI](https://github.com/Josdip/agentgate/actions/workflows/ci.yml/badge.svg)](https://github.com/Josdip/agentgate/actions/workflows/ci.yml)
+
 **Observe AI agent tool calls. Enforce policy. Review sensitive actions.**
 
 AgentGate is a local security gateway for a synthetic customer-support agent. It controls tool execution, records policy decisions, and gives a human reviewer a dashboard for approving sensitive requests.
