@@ -18,6 +18,10 @@ Run fourteen cases across three agents individually from the dashboard and watch
 
 See [the interactive demo and profile guide](docs/live-demo-and-profile.md) for usage and existing-clone update instructions.
 
+## Theme preference
+
+Use **Dark theme** in the header to switch between light and dark. Your choice is remembered locally; credentials are not saved. See [theme behavior and verification](docs/theme-toggle.md).
+
 ## Readable interface
 
 The light workspace redesign is documented in [interface redesign and verification](docs/interface-redesign.md), including desktop/mobile previews, interaction checks, and accessibility limits. Backend API and approval behavior remain unchanged.

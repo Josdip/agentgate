@@ -50,3 +50,9 @@ Validation: 55 automated tests pass, including a 1,001-record cursor traversal w
 On `codex/readable-interface`, implemented the owner's original light-workspace direction with readable type, action-first overview, comparable agent rows, explicit decision/review context, and responsive layouts. No backend/API/authorization changes or new security capability claims were introduced. Added loading/unavailable/stale guidance and context-preserving rendering, with session guards for disconnect races.
 
 Verification: 55 Python tests and five dependency-free JavaScript state tests pass, with the existing upstream TestClient warning. Desktop/mobile browser checks covered all fourteen demos, approval/rejection, profiles, search/pagination, keyboard focus, polling preservation, and server-failure feedback. Contrast values and native-zoom verification limits are recorded in `docs/interface-redesign.md`. Screenshots use disposable QA records; the temporary server was stopped.
+
+## Theme toggle — November 10, 2026
+
+On `codex/theme-toggle`, added an accessible header control and full-workspace light/dark semantic palettes. Only the validated preference is persisted; blocked storage does not disable switching, and authentication/API behavior is unchanged. Builds on the readable-interface task branch without merging to main.
+
+Verification: 55 Python tests and nine interface tests pass. Browser checks covered keyboard switching, reload persistence, navigation, connected demos, dark approval context, and a 390px mobile layout. Both palette contrast checks passed. The temporary QA server was stopped. Details and screenshots are in `docs/theme-toggle.md`.

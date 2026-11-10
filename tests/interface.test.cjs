@@ -137,3 +137,54 @@ test('a completed demo cannot overwrite disconnect guidance while its refresh is
   assert.match(document.getElementById('status').textContent,/Disconnected/);
   assert.equal(document.getElementById('scenarios').children[0].textContent,'Connect to run demo cases.');
 });
+
+function themedWorkspace(saved, blocked = false) {
+  const writes = [];
+  const root = {dataset: {}};
+  const toggle = {attributes: {}, listeners: {}, setAttribute(key, value) { this.attributes[key] = value; }, addEventListener(key, handler) { this.listeners[key] = handler; }};
+  let ready;
+  const document = {documentElement: root, getElementById: () => toggle, addEventListener(event, handler) { if (event === 'DOMContentLoaded') ready = handler; }};
+  const context = vm.createContext({document, localStorage: {
+    getItem() { if (blocked) throw new Error('Storage disabled'); return saved; },
+    setItem(key, value) { if (blocked) throw new Error('Storage disabled'); writes.push([key, value]); },
+  }});
+  vm.runInContext(readFileSync(resolve(__dirname, '../agentgate/static/theme.js'), 'utf8'), context);
+  return {root, toggle, writes, ready: () => ready()};
+}
+
+test('theme starts light and toggles accessibly in both directions', () => {
+  const page = themedWorkspace(null);
+  assert.equal(page.root.dataset.theme, 'light');
+  page.ready();
+  assert.equal(page.toggle.attributes['aria-pressed'], 'false');
+  page.toggle.listeners.click();
+  assert.equal(page.root.dataset.theme, 'dark');
+  assert.equal(page.toggle.attributes['aria-pressed'], 'true');
+  page.toggle.listeners.click();
+  assert.equal(page.root.dataset.theme, 'light');
+  assert.equal(page.toggle.attributes['aria-pressed'], 'false');
+  assert.deepEqual(page.writes, [['agentgate.theme', 'dark'], ['agentgate.theme', 'light']]);
+});
+
+test('saved dark preference is applied before DOM ready', () => {
+  const page = themedWorkspace('dark');
+  assert.equal(page.root.dataset.theme, 'dark');
+  page.ready();
+  assert.equal(page.toggle.attributes['aria-pressed'], 'true');
+});
+
+test('unexpected stored theme values fall back to light', () => {
+  const page = themedWorkspace('untrusted-theme-value');
+  assert.equal(page.root.dataset.theme, 'light');
+  page.ready();
+  assert.equal(page.toggle.attributes['aria-pressed'], 'false');
+});
+
+test('theme remains usable without browser storage', () => {
+  const page = themedWorkspace(null, true);
+  page.ready();
+  assert.doesNotThrow(() => page.toggle.listeners.click());
+  assert.equal(page.root.dataset.theme, 'dark');
+  assert.equal(page.toggle.attributes['aria-pressed'], 'true');
+  assert.deepEqual(page.writes, []);
+});
