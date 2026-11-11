@@ -92,8 +92,7 @@ Tests cover authorization boundaries, malformed arguments, refund thresholds, de
 
 ## Documentation
 
-For project work in Codex, see the [coding assistant workflow](docs/coding-agent-workflow.md)
-and repository instructions in [AGENTS.md](AGENTS.md).
+For project work in Codex, see the [coding assistant workflow](docs/coding-agent-workflow.md).
 
 | Guide | Contents |
 |---|---|

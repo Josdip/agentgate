@@ -2,8 +2,8 @@
 
 > Current launcher: local demo access is automatic; no reviewer token entry is needed. See [local demo access](local-demo-access.md). Bearer-token instructions below apply to optional authenticated mode.
 
-Open this repository folder in Codex. `AGENTS.md` supplies project guidance;
-Codex supplies the running model and coding tools. This setup does not create a
+Open this repository folder in Codex. Personal coding-assistant guidance can live
+in a local, untracked `AGENTS.md`; Codex supplies the running model and coding tools. This setup does not create a
 separate agent service or route Codex's tools through AgentGate enforcement.
 
 ## Environment
