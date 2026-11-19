@@ -155,9 +155,8 @@ document.addEventListener('click', event => {
 });
 window.addEventListener('popstate', navigate);
 
-byId('connect').addEventListener('submit', async event => {
-  event.preventDefault();
-  token = byId('token').value.trim();
+async function connect(reviewerToken) {
+  token = reviewerToken;
   try {
     await refresh(true);
     byId('token').value = '';
@@ -169,7 +168,20 @@ byId('connect').addEventListener('submit', async event => {
     token = '';
     announce(error.message);
   }
+}
+
+byId('connect').addEventListener('submit', event => {
+  event.preventDefault();
+  connect(byId('token').value.trim());
 });
+
+const firstRunCode = new URLSearchParams(location.hash.slice(1)).get('connect');
+if (firstRunCode) {
+  history.replaceState(history.state, '', location.pathname + location.search);
+  api('/api/first-run/connection', 'POST', {code: firstRunCode})
+    .then(({token: reviewerToken}) => connect(reviewerToken))
+    .catch(error => announce(error.message));
+}
 byId('disconnect').addEventListener('click', () => {
   generation++;
   token = '';

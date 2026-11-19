@@ -8,6 +8,7 @@ import sqlite3
 import time
 from contextlib import asynccontextmanager, closing, contextmanager
 from pathlib import Path
+from threading import Lock
 from typing import Annotated, Literal
 from urllib.error import URLError
 from urllib.request import ProxyHandler, Request, build_opener
@@ -63,6 +64,10 @@ Proposal = Annotated[Read | Write, Field(discriminator="tool")]
 
 class Rule(StrictModel):
     mode: Mode
+
+
+class BrowserConnection(StrictModel):
+    code: str = Field(min_length=1, max_length=128)
 
 
 class Review(StrictModel):
@@ -137,7 +142,14 @@ def fingerprint(action):
 
 
 def create_managed_app(
-    database, project, agent_token, reviewer_token, sonar_port=5000, *, launcher=None
+    database,
+    project,
+    agent_token,
+    reviewer_token,
+    sonar_port=5000,
+    *,
+    launcher=None,
+    first_run_code=None,
 ):
     if (
         min(len(agent_token), len(reviewer_token)) < 32
@@ -151,6 +163,8 @@ def create_managed_app(
     if not 1 <= sonar_port <= 65535:
         raise ValueError("Invalid local Sonar port.")
     ledger = Ledger(database)
+    first_run_lock = Lock()
+    first_run_expires = time.monotonic() + 300
 
     @asynccontextmanager
     async def lifespan(app):
@@ -208,6 +222,21 @@ def create_managed_app(
     @app.get("/static/{asset}")
     def static_asset(asset: Literal["styles.css", "theme.js", "managed.js"]):
         return FileResponse(STATIC / asset)
+
+    @app.post("/api/first-run/connection")
+    def first_run_connection(connection: BrowserConnection):
+        nonlocal first_run_code
+        with first_run_lock:
+            if (
+                not first_run_code
+                or time.monotonic() >= first_run_expires
+                or not hmac.compare_digest(connection.code.encode(), first_run_code.encode())
+            ):
+                raise HTTPException(
+                    401, "The one-use link is invalid or expired. Use the reviewer token."
+                )
+            first_run_code = None
+        return {"token": reviewer_token}
 
     @app.post("/api/discovery", dependencies=[reviewer])
     def scan():

@@ -63,11 +63,11 @@ def main():
     original_settings = sonar_agent.settings
     original_available = sonar_tools.available
 
-    def settings(module, body):
+    def settings(module, body, *args, **kwargs):
         for name in ("terminal", "desktop", "github", "rag", "web"):
             body[name] = False
         body["project"] = body["rag_path"] = "/project"
-        return original_settings(module, body)
+        return original_settings(module, body, *args, **kwargs)
 
     def available(config):
         return [

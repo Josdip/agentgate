@@ -190,3 +190,21 @@ def test_discovery_requires_explicit_enrollment_and_active_launcher(tmp_path):
         assert 'id="theme-toggle"' in client.get("/agents").text
         assert client.get("/static/theme.js").status_code == 200
     assert not launcher.active
+
+
+def test_first_run_link_is_one_use(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    with TestClient(
+        create_managed_app(
+            tmp_path / "data.sqlite3",
+            project,
+            AGENT_TOKEN,
+            REVIEWER_TOKEN,
+            first_run_code="valid-code",
+        )
+    ) as client:
+        route = "/api/first-run/connection"
+        assert client.post(route, json={"code": "bad-code"}).status_code == 401
+        assert client.post(route, json={"code": "valid-code"}).json() == {"token": REVIEWER_TOKEN}
+        assert client.post(route, json={"code": "valid-code"}).status_code == 401
