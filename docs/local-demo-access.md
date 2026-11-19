@@ -1,5 +1,8 @@
 # Local demo access
 
+> Historical synthetic workspace. For the default workspace on this branch, see
+> [Local Sonar governance](local-sonar-governance.md).
+
 Start `.venv/bin/python -m agentgate` and open http://127.0.0.1:8000.
 No sign-in, reviewer-token entry, model key, or external service is needed.
 Select **Try a $250 refund request**, inspect the decision, and approve or reject

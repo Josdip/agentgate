@@ -1,5 +1,8 @@
 # Real agent showcase scaffold
 
+> Historical synthetic workspace. For the default workspace on this branch, see
+> [Local Sonar governance](local-sonar-governance.md).
+
 The dashboard now reserves a **Real agent showcase** area. It is deliberately marked **Not connected**. The six scenario cards remain scripted; this separate slot is where a genuine agent integration can be added later.
 
 ## Implementation location
