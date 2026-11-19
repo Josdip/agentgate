@@ -4,7 +4,8 @@ Discover running Sonar from its process and loopback listener. Enrollment is a
 reviewer action that starts a dedicated instance of the original application
 inside Bubblewrap. Preserve the original process and its database. Mount only
 the stock source and template, the managed session state, and the broker
-credential. The virtual project directory has no backing access to the real
+credential. Seed the managed session with SQLite’s online backup so it can
+retain committed chats and context while the original process stays open. The virtual project directory has no backing access to the real
 protected project.
 
 The launcher installs a process-local adapter at Sonar's tool dispatch point.
