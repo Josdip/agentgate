@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentGate · Local agents</title>
+  <link rel="stylesheet" href="/static/managed.css">
+  <script src="/static/managed.js" defer></script>
+</head>
+<body>
+  <header><strong>AgentGate</strong><span>Local governance</span></header>
+  <main>
+    <h1>Agents and activity</h1>
+    <form id="connect">
+      <label for="token">Reviewer token</label>
+      <input id="token" type="password" required autocomplete="off">
+      <button>Connect</button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <div id="workspace" hidden>
+      <section aria-labelledby="agents-title">
+        <div class="section-heading">
+          <h2 id="agents-title">Discovered agents</h2>
+          <button id="scan" type="button">Scan this computer</button>
+        </div>
+        <p id="agent"></p>
+        <p class="muted">The local scan checks the configured Sonar endpoint.</p>
+      </section>
+      <section aria-labelledby="rules-title">
+        <h2 id="rules-title">Sonar rules</h2>
+        <form id="rules">
+          <label for="read_file">Read project files</label>
+          <select id="read_file" name="read_file">
+            <option value="allow">Allow</option><option value="review">Require review</option><option value="deny">Block</option>
+          </select>
+          <button type="button" data-save="read_file">Save read rule</button>
+          <label for="write_file">Write project files</label>
+          <select id="write_file" name="write_file">
+            <option value="allow">Allow</option><option value="review">Require review</option><option value="deny">Block</option>
+          </select>
+          <button type="button" data-save="write_file">Save write rule</button>
+        </form>
+        <p class="muted">Rules apply inside the configured project directory.</p>
+      </section>
+      <section aria-labelledby="activity-title">
+        <h2 id="activity-title">Sonar activity</h2>
+        <div id="activity"></div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

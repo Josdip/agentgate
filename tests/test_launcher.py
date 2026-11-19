@@ -1,36 +1,28 @@
-import os
-import stat
-
 from agentgate.__main__ import main
 
 
-def test_launcher_creates_private_credentials_and_preserves_them(tmp_path, monkeypatch):
+def test_managed_launcher_reads_separate_token_files_and_listens_on_loopback(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("AGENTGATE_AGENT_TOKEN", raising=False)
-    monkeypatch.delenv("AGENTGATE_REVIEWER_TOKEN", raising=False)
-    monkeypatch.delenv("AGENTGATE_DB", raising=False)
-    monkeypatch.delenv("AGENTGATE_DEMO_MODE", raising=False)
-    calls = []
+    agent, reviewer = tmp_path / "agent-token", tmp_path / "reviewer-token"
+    agent.write_text("a" * 32 + "\n")
+    reviewer.write_text("r" * 32 + "\n")
+    monkeypatch.setenv("AGENTGATE_PROJECT", str(tmp_path))
+    monkeypatch.setenv("AGENTGATE_SONAR_TOKEN_FILE", str(agent))
+    monkeypatch.setenv("AGENTGATE_REVIEWER_TOKEN_FILE", str(reviewer))
+    monkeypatch.setenv("AGENTGATE_SONAR_PORT", "5001")
+    for name in ("AGENTGATE_PORT", "AGENTGATE_DB"):
+        monkeypatch.delenv(name, raising=False)
+    configured = []
+    listeners = []
     monkeypatch.setattr(
-        "agentgate.__main__.uvicorn.run", lambda app, **kwargs: calls.append(kwargs)
+        "agentgate.__main__.create_managed_app", lambda *args: configured.append(args)
+    )
+    monkeypatch.setattr(
+        "agentgate.__main__.uvicorn.run", lambda app, **kwargs: listeners.append(kwargs)
     )
     main()
-    credentials = (tmp_path / ".env").read_text()
-    assert stat.S_IMODE((tmp_path / ".env").stat().st_mode) == 0o600
-    assert len(os.environ["AGENTGATE_AGENT_TOKEN"]) >= 24
-    assert os.environ["AGENTGATE_AGENT_TOKEN"] != os.environ["AGENTGATE_REVIEWER_TOKEN"]
-    main()
-    assert (tmp_path / ".env").read_text() == credentials
-    assert calls == [{"host": "127.0.0.1", "port": 8000, "proxy_headers": False}] * 2
-
-
-def test_launcher_defaults_to_demo_and_supports_explicit_authenticated_mode(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    configured = []
-    monkeypatch.delenv("AGENTGATE_DEMO_MODE", raising=False)
-    monkeypatch.setattr("agentgate.__main__.create_app", lambda **kwargs: configured.append(kwargs))
-    monkeypatch.setattr("agentgate.__main__.uvicorn.run", lambda *args, **kwargs: None)
-    main()
-    monkeypatch.setenv("AGENTGATE_DEMO_MODE", "0")
-    main()
-    assert configured == [{"demo_mode": True}, {"demo_mode": False}]
+    database, project, agent_token, reviewer_token, port = configured[0]
+    assert database.name == "discovery.sqlite3"
+    assert project == str(tmp_path)
+    assert (agent_token, reviewer_token, port) == ("a" * 32, "r" * 32, 5001)
+    assert listeners == [{"host": "127.0.0.1", "port": 8001, "proxy_headers": False}]
