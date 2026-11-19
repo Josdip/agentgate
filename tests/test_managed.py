@@ -190,3 +190,96 @@ def test_discovery_requires_explicit_enrollment_and_active_launcher(tmp_path):
         assert 'id="theme-toggle"' in client.get("/agents").text
         assert client.get("/static/theme.js").status_code == 200
     assert not launcher.active
+
+
+def test_first_run_link_is_one_use(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    with TestClient(
+        create_managed_app(
+            tmp_path / "data.sqlite3",
+            project,
+            AGENT_TOKEN,
+            REVIEWER_TOKEN,
+            first_run_code="valid-code",
+        )
+    ) as client:
+        route = "/api/first-run/connection"
+        assert client.post(route, json={"code": "bad-code"}).status_code == 401
+        assert client.post(route, json={"code": "valid-code"}).json() == {"token": REVIEWER_TOKEN}
+        assert client.post(route, json={"code": "valid-code"}).status_code == 401
+
+
+def test_invalid_tool_request_is_recorded_without_untrusted_values(gate):
+    client, _ = gate
+    request_id = uuid4()
+    url = f"/api/proposals/{request_id}"
+    write = {"tool": "write_file", "path": "/outside/private.txt", "content": "private text"}
+    assert client.put(url, json=write, headers=REVIEWER).status_code in {401, 422}
+    assert client.get("/api/overview", headers=REVIEWER).json()["activity"] == []
+    assert client.put(url, json=write, headers=AGENT).status_code == 422
+    rows = client.get("/api/overview", headers=REVIEWER).json()["activity"]
+    assert [(row["tool"], row["status"], row["decision"]) for row in rows] == [
+        ("write_file", "denied", "invalid request")
+    ]
+    assert "private" not in str(rows)
+
+
+def test_chrome_one_use_code_can_report_only_inventory(gate):
+    client, _ = gate
+    code_route = "/api/connectors/chrome/code"
+    observation_route = "/api/connectors/chrome/observation"
+    assert client.post(code_route, headers=AGENT).status_code == 401
+    code = client.post(code_route, headers=REVIEWER).json()["code"]
+    discovery = {"Authorization": f"Bearer {code}"}
+    assert client.get("/api/overview", headers=discovery).status_code == 401
+    assert (
+        client.post(
+            observation_route, headers=discovery, json={"service": "chatgpt", "cookies": "secret"}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(observation_route, headers=discovery, json={"service": "chatgpt"}).status_code
+        == 200
+    )
+    assert (
+        client.post(observation_route, headers=discovery, json={"service": "chatgpt"}).status_code
+        == 401
+    )
+    agents = client.get("/api/overview", headers=REVIEWER).json()["external_agents"]
+    assert [(agent["connector"], agent["name"], agent["provider_status"]) for agent in agents] == [
+        ("chrome", "ChatGPT", "Tab observed")
+    ]
+
+
+def test_bedrock_refresh_is_scoped_and_does_not_change_sonar(gate, monkeypatch):
+    client, _ = gate
+    route = "/api/connectors/bedrock/discovery"
+    limits = []
+    names = [("ABCDEF1234", "Example", "PREPARED")]
+
+    def scan(region, profile):
+        limits.append((region, profile))
+        return "123456789012", list(names)
+
+    monkeypatch.setattr("agentgate.managed.bedrock_agents", scan)
+    assert client.post(route, json={"region": "us-east-1"}, headers=AGENT).status_code == 401
+    assert (
+        client.post(
+            route, json={"region": "us-east-1", "profile": "--debug"}, headers=REVIEWER
+        ).status_code
+        == 422
+    )
+    assert client.post(
+        route, json={"region": "us-east-1", "profile": "inventory"}, headers=REVIEWER
+    ).json() == {"count": 1}
+    assert client.post(route, json={"region": "us-west-2"}, headers=REVIEWER).json() == {"count": 1}
+    names.clear()
+    assert client.post(route, json={"region": "us-east-1"}, headers=REVIEWER).json() == {"count": 0}
+    data = client.get("/api/overview", headers=REVIEWER).json()
+    assert list(data["agents"]) == []
+    assert len(data["rules"]) == 2
+    assert len(data["external_agents"]) == 1
+    assert data["external_agents"][0]["scope"] == "123456789012 · us-west-2"
+    assert limits == [("us-east-1", "inventory"), ("us-west-2", ""), ("us-east-1", "")]

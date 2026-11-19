@@ -52,7 +52,7 @@ function renderAction(action) {
   const item = element('article', '', 'action');
   const head = element('div', '', 'action-head');
   head.append(element('strong', 'Sonar · ' + tools[action.tool] + ' · ' + action.path),
-    element('span', states[action.status], 'badge ' + action.status));
+    element('span', action.decision === "invalid request" ? "Blocked · invalid request" : states[action.status], 'badge ' + action.status));
   item.append(head, element('p', 'Rule: ' + action.decision + ' · ' +
     new Date(action.created * 1000).toLocaleString(), 'help'));
   if (action.size !== null) {
@@ -72,31 +72,44 @@ function renderAction(action) {
   return item;
 }
 
-function renderDirectory(agent) {
+function renderDirectory(agent, externalAgents) {
   const directory = byId('agent-directory');
-  if (!agent) {
+  if (!agent && !externalAgents.length) {
     byId('agent-count').textContent = 'No agents discovered yet.';
     directory.replaceChildren();
     return;
   }
-  const state = {discovered: 'Discovered · awaiting enrollment', managed: 'Managed', offline: 'Unreachable'};
-  const row = element('tr', '');
-  for (const value of ['Sonar · Local AI assistant', 'Local operator', 'This computer', state[agent.state],
-    new Date(agent.scanned * 1000).toLocaleString()]) row.append(element('td', value));
-  const cell = element('td', '');
-  if (agent.state === 'discovered') {
-    cell.append(button('Add Sonar', () => byId('enrollment').showModal()));
+  const rows = [];
+  if (agent) {
+    const state = {discovered: 'Discovered · awaiting enrollment', managed: 'Managed', offline: 'Unreachable'};
+    const row = element('tr', '');
+    for (const value of ['Sonar · Local AI assistant', 'Local operator', 'This computer', state[agent.state],
+      new Date(agent.scanned * 1000).toLocaleString()]) row.append(element('td', value));
+    const cell = element('td', '');
+    if (agent.state === 'discovered') {
+      cell.append(button('Add Sonar', () => byId('enrollment').showModal()));
+    }
+    if (agent.url) {
+      const link = element('a', 'Open managed Sonar');
+      link.href = agent.url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      cell.append(link);
+    }
+    row.append(cell);
+    rows.push(row);
   }
-  if (agent.url) {
-    const link = element('a', 'Open managed Sonar');
-    link.href = agent.url;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    cell.append(link);
+  for (const observed of externalAgents) {
+    const row = element('tr', '');
+    const location = observed.connector === 'chrome' ? 'Chrome · ChatGPT' : 'AWS Bedrock · ' + observed.scope;
+    for (const value of [observed.name, '—', location,
+      'Discovered · ' + observed.provider_status, new Date(observed.scanned * 1000).toLocaleString(),
+      'Inventory only']) row.append(element('td', value));
+    rows.push(row);
   }
-  row.append(cell);
-  directory.replaceChildren(row);
-  byId('agent-count').textContent = '1 agent';
+  directory.replaceChildren(...rows);
+  byId('agent-count').textContent = rows.length + (rows.length === 1 ? ' agent' : ' agents');
+
 }
 
 function render() {
@@ -107,12 +120,12 @@ function render() {
     else link.removeAttribute('aria-current');
   }
   if (!snapshot) return;
-  const {agents, activity, counts} = snapshot;
+  const {agents, external_agents: externalAgents = [], activity, counts} = snapshot;
   const agent = agents[0];
-  const view = JSON.stringify([page, page === 'agents' ? agent : [agent, activity, counts, filter, search]]);
+  const view = JSON.stringify([page, page === 'agents' ? [agent, externalAgents] : [agent, activity, counts, filter, search]]);
   if (view === lastView) return;
   lastView = view;
-  if (page === 'agents') renderDirectory(agent);
+  if (page === 'agents') renderDirectory(agent, externalAgents);
   if (page === 'home') {
     for (const status of ['pending', 'denied', 'executed', 'total']) byId(status).textContent = counts[status];
     byId('attention').textContent = counts.pending + ' requests awaiting review';
@@ -137,6 +150,7 @@ async function refresh(loadRules = false) {
   const data = await api('/api/overview');
   if (current !== generation) return;
   snapshot = data;
+  byId("external-connectors").hidden = !Array.isArray(data.external_agents);
   if (loadRules) for (const rule of data.rules) byId(rule.tool).value = rule.mode;
   render();
 }
@@ -155,9 +169,8 @@ document.addEventListener('click', event => {
 });
 window.addEventListener('popstate', navigate);
 
-byId('connect').addEventListener('submit', async event => {
-  event.preventDefault();
-  token = byId('token').value.trim();
+async function connect(reviewerToken) {
+  token = reviewerToken;
   try {
     await refresh(true);
     byId('token').value = '';
@@ -169,11 +182,26 @@ byId('connect').addEventListener('submit', async event => {
     token = '';
     announce(error.message);
   }
+}
+
+byId('connect').addEventListener('submit', event => {
+  event.preventDefault();
+  connect(byId('token').value.trim());
 });
+
+const firstRunCode = new URLSearchParams(location.hash.slice(1)).get('connect');
+if (firstRunCode) {
+  history.replaceState(history.state, '', location.pathname + location.search);
+  api('/api/first-run/connection', 'POST', {code: firstRunCode})
+    .then(({token: reviewerToken}) => connect(reviewerToken))
+    .catch(error => announce(error.message));
+}
 byId('disconnect').addEventListener('click', () => {
   generation++;
   token = '';
   snapshot = null;
+  byId('chrome-token').value = '';
+  byId('chrome-pairing').hidden = true;
   lastView = '';
   byId('workspace-data').hidden = true;
   byId('disconnect').hidden = true;
@@ -204,6 +232,30 @@ for (const [id, action] of [
     finally { control.disabled = false; }
   });
 }
+byId('chrome-code').addEventListener('click', async () => {
+  const current = generation;
+  try {
+    const result = await api('/api/connectors/chrome/code', 'POST');
+    if (current !== generation) return;
+    byId('chrome-origin').value = location.origin;
+    byId('chrome-token').value = result.code;
+    byId('chrome-pairing').hidden = false;
+    announce('Copy the discovery code into the Chrome extension.');
+  } catch (error) { announce(error.message); }
+});
+byId('bedrock-scan').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector('button');
+  button.disabled = true;
+  try {
+    const result = await api('/api/connectors/bedrock/discovery', 'POST', {
+      region: byId('bedrock-region').value.trim(), profile: byId('bedrock-profile').value.trim(),
+    });
+    await refresh();
+    announce('Bedrock agents discovered: ' + result.count + '.');
+  } catch (error) { announce(error.message); }
+  finally { button.disabled = false; }
+});
 byId('cancel-enroll').addEventListener('click', () => byId('enrollment').close());
 byId('activity-filters').addEventListener('submit', event => {
   event.preventDefault();

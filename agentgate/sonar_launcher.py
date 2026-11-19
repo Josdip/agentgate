@@ -2,10 +2,14 @@
 
 import os
 import socket
+import sqlite3
 import subprocess
 import threading
 import time
+from contextlib import closing
+from dataclasses import dataclass
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from urllib.error import URLError
 from urllib.request import ProxyHandler, build_opener
 
@@ -23,6 +27,13 @@ MODULES = (
 )
 
 
+@dataclass(frozen=True)
+class SonarInstance:
+    source: Path
+    database: Path
+    packages: Path | None = None
+
+
 def local_sonar(source, port):
     # A known script and working tree are discovery evidence, not enrollment.
     with Path("/proc/net/tcp").open() as table:
@@ -32,7 +43,7 @@ def local_sonar(source, port):
             if (fields := line.split())[1] == f"0100007F:{port:04X}" and fields[3] == "0A"
         }
     if not listeners:
-        return False
+        return None
     for process in Path("/proc").iterdir():
         if not process.name.isdecimal():
             continue
@@ -40,13 +51,66 @@ def local_sonar(source, port):
             args = (process / "cmdline").read_bytes().split(b"\0")
             if len(args) < 2 or Path(os.fsdecode(args[1])).name != "sonar.py":
                 continue
-            if (process / "cwd").resolve(strict=True) != source:
+            cwd = (process / "cwd").resolve(strict=True)
+            script = (cwd / os.fsdecode(args[1])).resolve(strict=True)
+            root = script.parent
+            if source is not None and root != source:
                 continue
-            if any(os.readlink(fd) in listeners for fd in (process / "fd").iterdir()):
-                return True
+            if not all((root / f"{module}.py").is_file() for module in MODULES):
+                continue
+            if not any(os.readlink(fd) in listeners for fd in (process / "fd").iterdir()):
+                continue
+            settings = {}
+            for entry in (process / "environ").read_bytes().split(b"\0"):
+                key, sep, value = entry.partition(b"=")
+                if sep and key in {b"SONAR_DB", b"VIRTUAL_ENV"}:
+                    settings[key] = os.fsdecode(value)
+            database = (
+                cwd / settings[b"SONAR_DB"] if settings.get(b"SONAR_DB") else root / "chat.sqlite3"
+            )
+            interpreter = cwd / os.fsdecode(args[0])
+            env = Path(settings.get(b"VIRTUAL_ENV", interpreter.parent.parent))
+            packages = env / "lib" / "python3.12" / "site-packages"
+            return SonarInstance(
+                root, database.resolve(strict=True), packages if packages.is_dir() else None
+            )
         except OSError:
             continue
-    return False
+    return None
+
+
+def preserve_history(database, state):
+    """Seed the managed database once using SQLite's consistent online snapshot."""
+    target = state / "chat.sqlite3"
+    origin = state / "history-source"
+    if target.exists():
+        if not origin.exists() or origin.read_text() != str(database):
+            raise ValueError("This managed session already belongs to a different Sonar history.")
+        return
+    if not database.is_file():
+        raise ValueError("Sonar's chat database could not be found.")
+    with NamedTemporaryFile(dir=state, prefix=".history-", delete=False) as file:
+        staged = Path(file.name)
+    deadline = time.monotonic() + 15
+
+    def check_progress(status, remaining, total):
+        if time.monotonic() >= deadline:
+            raise sqlite3.OperationalError("Snapshot did not finish in time.")
+
+    try:
+        with (
+            closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=2)) as source,
+            closing(sqlite3.connect(staged)) as destination,
+        ):
+            source.backup(destination, pages=100, progress=check_progress)
+        origin.write_text(str(database))
+        staged.replace(target)
+    except sqlite3.Error as exc:
+        raise ValueError(
+            "Could not copy Sonar's chat history. Check the source database and retry."
+        ) from exc
+    finally:
+        staged.unlink(missing_ok=True)
 
 
 class SonarLauncher:
@@ -55,7 +119,7 @@ class SonarLauncher:
             raise ValueError("Invalid local service port.")
         if len({gateway_port, standalone_port, managed_port}) != 3:
             raise ValueError("Use a different port for each local service.")
-        self.source = Path(source).expanduser().resolve()
+        self.source = Path(source).expanduser().resolve() if source else None
         self.state = Path(state).resolve()
         self.token_file = Path(token_file).resolve()
         self.gateway_port = gateway_port
@@ -78,14 +142,17 @@ class SonarLauncher:
         with self.lock:
             if self.running():
                 return
-            if not self.discover():
+            instance = self.discover()
+            if not instance:
                 raise ValueError("Run standalone Sonar and scan again.")
             with socket.socket() as probe:
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 try:
                     probe.bind(("127.0.0.1", self.managed_port))
                 except OSError as exc:
                     raise ValueError("The managed Sonar port is already in use.") from exc
             self.state.mkdir(mode=0o700, parents=True, exist_ok=True)
+            preserve_history(instance.database, self.state)
             script = Path(__file__).with_name("sonar_runtime.py")
             command = [
                 "bwrap",
@@ -114,7 +181,7 @@ class SonarLauncher:
                 str(script),
                 "/launch.py",
                 "--ro-bind",
-                str(self.source / "templates" / "index.html"),
+                str(instance.source / "templates" / "index.html"),
                 "/sonar/templates/index.html",
                 "--ro-bind",
                 str(self.token_file),
@@ -125,7 +192,18 @@ class SonarLauncher:
             ]
             for module in MODULES:
                 name = f"{module}.py"
-                command.extend(["--ro-bind", str(self.source / name), f"/sonar/{name}"])
+                command.extend(["--ro-bind", str(instance.source / name), f"/sonar/{name}"])
+            if instance.packages is not None:
+                command.extend(
+                    [
+                        "--ro-bind",
+                        str(instance.packages),
+                        "/sonar-deps",
+                        "--setenv",
+                        "PYTHONPATH",
+                        "/sonar-deps",
+                    ]
+                )
             command.extend(
                 [
                     "--setenv",
@@ -167,6 +245,14 @@ class SonarLauncher:
                 except (URLError, OSError):
                     time.sleep(0.1)
             self.stop()
+            error_log = self.state / "launcher.log"
+            if (
+                "setting up uid map: Permission denied"
+                in error_log.read_text(errors="replace")[-2048:]
+            ):
+                raise ValueError(
+                    "Bubblewrap is blocked by AppArmor. Restart AgentGate using ./start-local to finish sandbox setup."
+                )
             raise ValueError(f"Managed Sonar failed to start. See {self.state / 'launcher.log'}.")
 
     def stop(self):

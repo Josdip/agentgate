@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentGate Browser Discovery</title>
+  <script src="popup.js" defer></script>
+</head>
+<body>
+  <h1>Report ChatGPT</h1>
+  <p>Open ChatGPT in the active tab, then report it to your local AgentGate inventory.</p>
+  <form id="report">
+    <label for="gateway">AgentGate address</label>
+    <input id="gateway" type="url" value="http://127.0.0.1:8001" required>
+    <label for="code">Discovery code</label>
+    <input id="code" type="password" autocomplete="off" required>
+    <button>Report active tab</button>
+  </form>
+  <p id="result" role="status"></p>
+</body>
+</html>
