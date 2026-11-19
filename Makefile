@@ -13,4 +13,4 @@ check:
 # Optional local interface regressions (Node.js 18+; no npm dependencies).
 check-interface:
 	node --check agentgate/static/managed.js
-	node --test tests/interface.test.cjs
+	node --test tests/interface.test.cjs tests/chrome-connector.test.cjs

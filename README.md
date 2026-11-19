@@ -20,6 +20,7 @@ one-use reviewer link it prints.
 ```
 
 - [Run the local Sonar integration](docs/local-sonar-governance.md)
+- [Preview Chrome and AWS Bedrock discovery](docs/external-discovery.md)
 - [Design decision and trust boundary](docs/decisions/002-managed-local-sonar.md)
 - [Contributing](CONTRIBUTING.md)
 

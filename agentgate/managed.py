@@ -22,6 +22,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .client import NoRedirect
+from .cloud import CloudInventoryError, bedrock_agents
 from .policy import StrictModel
 from .project_files import MAX_BYTES, ProjectFiles, relative_path
 
@@ -67,6 +68,15 @@ class Rule(StrictModel):
     mode: Mode
 
 
+class ChromeObservation(StrictModel):
+    service: Literal["chatgpt"]
+
+
+class BedrockScan(StrictModel):
+    region: str = Field(pattern=r"^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$", max_length=40)
+    profile: str = Field(default="", pattern=r"^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,63})?$")
+
+
 class BrowserConnection(StrictModel):
     code: str = Field(min_length=1, max_length=128)
 
@@ -109,6 +119,11 @@ class Ledger:
                     tool TEXT PRIMARY KEY, mode TEXT NOT NULL, revision INTEGER NOT NULL
                 );
                 INSERT OR IGNORE INTO rules VALUES ('read_file', 'review', 1), ('write_file', 'deny', 1);
+                CREATE TABLE IF NOT EXISTS external_agents (
+                    connector TEXT NOT NULL, scope TEXT NOT NULL, external_id TEXT NOT NULL,
+                    name TEXT NOT NULL, provider_status TEXT NOT NULL, scanned REAL NOT NULL,
+                    PRIMARY KEY (connector, scope, external_id)
+                );
                 CREATE TABLE IF NOT EXISTS actions (
                     id TEXT PRIMARY KEY, tool TEXT NOT NULL, path TEXT NOT NULL,
                     digest TEXT NOT NULL, size INTEGER, created REAL NOT NULL,
@@ -122,6 +137,20 @@ class Ledger:
             db.row_factory = sqlite3.Row
             db.execute("BEGIN IMMEDIATE")
             yield db
+
+    def record_external(self, connector, scope, agents):
+        with self.transaction() as db:
+            db.execute(
+                "DELETE FROM external_agents WHERE connector=? AND scope=?", (connector, scope)
+            )
+            scanned = time.time()
+            db.executemany(
+                "INSERT INTO external_agents VALUES (?,?,?,?,?,?)",
+                [
+                    (connector, scope, identifier, name, state, scanned)
+                    for identifier, name, state in agents
+                ],
+            )
 
     def invalid(self, action_id, tool):
         with self.transaction() as db:
@@ -176,6 +205,9 @@ def create_managed_app(
     ledger = Ledger(database)
     first_run_lock = Lock()
     first_run_expires = time.monotonic() + 300
+    connector_lock = Lock()
+    chrome_code = ""
+    chrome_expires = 0.0
 
     @asynccontextmanager
     async def lifespan(app):
@@ -271,6 +303,42 @@ def create_managed_app(
             first_run_code = None
         return {"token": reviewer_token}
 
+    @app.post("/api/connectors/chrome/code", dependencies=[reviewer])
+    def new_chrome_code():
+        nonlocal chrome_code, chrome_expires
+        code = secrets.token_urlsafe(32)
+        with connector_lock:
+            chrome_code = code
+            chrome_expires = time.monotonic() + 600
+        return {"code": code, "expires_in": 600}
+
+    @app.post("/api/connectors/chrome/observation")
+    def observe_chrome(observation: ChromeObservation, authorization: str = Header(default="")):
+        nonlocal chrome_code
+        with connector_lock:
+            if (
+                not chrome_code
+                or time.monotonic() >= chrome_expires
+                or not hmac.compare_digest(authorization.encode(), f"Bearer {chrome_code}".encode())
+            ):
+                raise HTTPException(401, "Invalid Chrome discovery code.")
+            ledger.record_external(
+                "chrome",
+                "This browser",
+                [(observation.service, "ChatGPT", "Tab observed")],
+            )
+            chrome_code = ""
+        return {"recorded": True}
+
+    @app.post("/api/connectors/bedrock/discovery", dependencies=[reviewer])
+    def scan_bedrock(scan: BedrockScan):
+        try:
+            account, agents = bedrock_agents(scan.region, scan.profile)
+        except CloudInventoryError as exc:
+            raise HTTPException(409, str(exc)) from None
+        ledger.record_external("bedrock", f"{account} · {scan.region}", agents)
+        return {"count": len(agents)}
+
     @app.post("/api/discovery", dependencies=[reviewer])
     def scan():
         if launcher:
@@ -316,6 +384,12 @@ def create_managed_app(
                     agents[0]["url"] = launcher.url
             return {
                 "agents": agents,
+                "external_agents": [
+                    dict(row)
+                    for row in db.execute(
+                        "SELECT * FROM external_agents ORDER BY connector, scope, name, external_id"
+                    )
+                ],
                 "counts": dict(
                     db.execute(
                         """SELECT COUNT(*) AS total,

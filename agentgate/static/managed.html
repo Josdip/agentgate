@@ -38,8 +38,29 @@
       <section class="recent-panel"><div class="section-heading"><div><h2>Recent activity</h2><p>The three latest actions across your agents.</p></div><a href="/activity" data-nav>View all activity →</a></div><div id="recent-actions"></div></section>
     </div>
     <div id="agents-page" hidden>
-      <section class="page-intro"><div><p class="eyebrow">Agents</p><h1>Understand who has access</h1><p>Discover local agents and choose which to add.</p></div><span class="scope-note">This computer</span></section>
+      <section class="page-intro"><div><p class="eyebrow">Agents</p><h1>Understand who has access</h1><p>Discover local agents and choose which to add.</p></div><span class="scope-note">Local, browser, and cloud</span></section>
       <section id="directory-panel"><div class="directory-toolbar"><h2>Registered agents</h2><button id="scan" type="button">Scan this computer</button></div><p id="agent-count" class="help"></p><div class="table-scroll"><table class="agent-table"><caption class="sr-only">Local agents and management status</caption><thead><tr><th scope="col">Agent & purpose</th><th scope="col">Owner</th><th scope="col">Location</th><th scope="col">Observation</th><th scope="col">Last scan</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="agent-directory"></tbody></table></div><p class="coverage-note">Enforcement applies to project file reads and writes in the managed session.</p></section>
+      <section id="external-connectors" class="rules-guards" aria-labelledby="connectors-title" hidden>
+        <h2 id="connectors-title">Discover more agents</h2>
+        <p>Browser and cloud discoveries are inventory only. Rules apply to enrolled Sonar file tools.</p>
+        <details><summary>ChatGPT in Chrome</summary>
+          <p>Load the AgentGate Chrome extension, open ChatGPT, and report the active tab using a one-use code.</p>
+          <button id="chrome-code" type="button">Generate discovery code</button>
+          <div id="chrome-pairing" hidden>
+            <label for="chrome-origin">AgentGate address</label><input id="chrome-origin" readonly>
+            <label for="chrome-token">One-use discovery code</label><input id="chrome-token" readonly>
+            <p class="help">The code expires in 10 minutes.</p>
+          </div>
+        </details>
+        <details><summary>AWS Bedrock Agents</summary>
+          <p>Scan one region using the AWS CLI session on this computer.</p>
+          <form id="bedrock-scan" class="field-inline">
+            <label for="bedrock-region">AWS region</label><input id="bedrock-region" placeholder="us-east-1" required maxlength="40">
+            <label for="bedrock-profile">AWS CLI profile (optional)</label><input id="bedrock-profile" maxlength="64">
+            <button>Scan Bedrock Agents</button>
+          </form>
+        </details>
+      </section>
       <dialog id="enrollment"><h2>Add Sonar to AgentGate?</h2><p>Start a managed Sonar session with a copy of your existing chats, projects, and saved context. Your standalone session stays open. New activity is saved separately.</p><div class="form-actions"><button id="confirm-enroll">Add and launch Sonar</button><button id="cancel-enroll" class="secondary">Cancel</button></div></dialog>
     </div>
     <div id="activity-page" hidden>
