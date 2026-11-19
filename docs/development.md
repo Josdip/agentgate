@@ -1,5 +1,8 @@
 # Development guide
 
+> Historical synthetic workspace. For the default workspace on this branch, see
+> [Local Sonar governance](local-sonar-governance.md).
+
 ## Prerequisites
 
 Python 3.12 or later and Git. No model API key, Node.js, or external database is required.
