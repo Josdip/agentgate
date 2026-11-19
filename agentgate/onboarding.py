@@ -20,6 +20,7 @@ profile agentgate-bwrap /usr/bin/bwrap flags=(unconfined) {
 
 def local_port(default):
     with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         for port in (default, 0):
             try:
                 listener.bind(("127.0.0.1", port))

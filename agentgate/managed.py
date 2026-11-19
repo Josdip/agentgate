@@ -18,6 +18,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import Field, field_validator
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .client import NoRedirect
@@ -122,6 +123,16 @@ class Ledger:
             db.execute("BEGIN IMMEDIATE")
             yield db
 
+    def invalid(self, action_id, tool):
+        with self.transaction() as db:
+            db.execute(
+                """INSERT OR IGNORE INTO actions
+                (id, tool, path, digest, size, created, decision, status, revision)
+                SELECT ?, tool, '[Invalid project path or arguments]', '', NULL, ?,
+                       'invalid request', 'denied', revision FROM rules WHERE tool=?""",
+                (action_id, time.time(), tool),
+            )
+
     @staticmethod
     def action(db, action_id):
         row = db.execute("SELECT * FROM actions WHERE id=?", (action_id,)).fetchone()
@@ -200,6 +211,28 @@ def create_managed_app(
 
     @app.exception_handler(RequestValidationError)
     async def invalid_input(request, exc):
+        # Retain only a safe label when a real agent submits malformed tool arguments.
+        body = exc.body
+        request_id = request.path_params.get("request_id")
+        if (
+            request.method == "PUT"
+            and request.url.path.startswith("/api/proposals/")
+            and request_id
+            and isinstance(body, dict)
+            and isinstance(body.get("tool"), str)
+            and body["tool"] in {"read_file", "write_file"}
+            and hmac.compare_digest(
+                request.headers.get("Authorization", "").encode(), f"Bearer {agent_token}".encode()
+            )
+            and (launcher is None or launcher.running())
+        ):
+            try:
+                action_id = str(UUID(request_id))
+            except ValueError:
+                pass
+            else:
+                # Use the worker thread like the other disk-bound API handlers.
+                await run_in_threadpool(ledger.invalid, action_id, body["tool"])
         return JSONResponse({"detail": "Invalid request."}, status_code=422)
 
     def role(token):

@@ -146,6 +146,7 @@ class SonarLauncher:
             if not instance:
                 raise ValueError("Run standalone Sonar and scan again.")
             with socket.socket() as probe:
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 try:
                     probe.bind(("127.0.0.1", self.managed_port))
                 except OSError as exc:

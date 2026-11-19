@@ -208,3 +208,18 @@ def test_first_run_link_is_one_use(tmp_path):
         assert client.post(route, json={"code": "bad-code"}).status_code == 401
         assert client.post(route, json={"code": "valid-code"}).json() == {"token": REVIEWER_TOKEN}
         assert client.post(route, json={"code": "valid-code"}).status_code == 401
+
+
+def test_invalid_tool_request_is_recorded_without_untrusted_values(gate):
+    client, _ = gate
+    request_id = uuid4()
+    url = f"/api/proposals/{request_id}"
+    write = {"tool": "write_file", "path": "/outside/private.txt", "content": "private text"}
+    assert client.put(url, json=write, headers=REVIEWER).status_code in {401, 422}
+    assert client.get("/api/overview", headers=REVIEWER).json()["activity"] == []
+    assert client.put(url, json=write, headers=AGENT).status_code == 422
+    rows = client.get("/api/overview", headers=REVIEWER).json()["activity"]
+    assert [(row["tool"], row["status"], row["decision"]) for row in rows] == [
+        ("write_file", "denied", "invalid request")
+    ]
+    assert "private" not in str(rows)

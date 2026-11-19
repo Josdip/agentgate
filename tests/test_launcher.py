@@ -3,6 +3,7 @@ from agentgate.__main__ import main
 
 def test_managed_launcher_reads_separate_token_files_and_listens_on_loopback(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("agentgate.__main__.local_port", lambda port: port)
     agent, reviewer = tmp_path / "agent-token", tmp_path / "reviewer-token"
     agent.write_text("a" * 32 + "\n")
     reviewer.write_text("r" * 32 + "\n")

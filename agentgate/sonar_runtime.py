@@ -21,6 +21,10 @@ def broker(gateway_port, token, name, args, cancel):
         return "Blocked: this operation is unavailable. Continue any independent steps."
     opener = build_opener(ProxyHandler({}), NoRedirect())
     url = f"http://127.0.0.1:{gateway_port}/api/proposals/{uuid4()}"
+    args = dict(args)
+    path = args.get("path")
+    if isinstance(path, str) and path.startswith("/project/"):
+        args["path"] = path.removeprefix("/project/")
     payload = json.dumps({"tool": name, **args}).encode()
 
     def call(method, suffix="", data=None):
