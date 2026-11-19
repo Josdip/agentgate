@@ -15,13 +15,16 @@ def test_managed_launcher_reads_separate_token_files_and_listens_on_loopback(tmp
     configured = []
     listeners = []
     monkeypatch.setattr(
-        "agentgate.__main__.create_managed_app", lambda *args: configured.append(args)
+        "agentgate.__main__.create_managed_app",
+        lambda *args, **kwargs: configured.append((args, kwargs)),
     )
     monkeypatch.setattr(
         "agentgate.__main__.uvicorn.run", lambda app, **kwargs: listeners.append(kwargs)
     )
     main()
-    database, project, agent_token, reviewer_token, port = configured[0]
+    args, options = configured[0]
+    database, project, agent_token, reviewer_token, port = args
+    assert options["launcher"].managed_port == 5002
     assert database.name == "discovery.sqlite3"
     assert project == str(tmp_path)
     assert (agent_token, reviewer_token, port) == ("a" * 32, "r" * 32, 5001)

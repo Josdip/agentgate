@@ -3,50 +3,63 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AgentGate · Local agents</title>
-  <link rel="stylesheet" href="/static/managed.css">
+  <title>AgentGate · Overview</title>
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/managed.js" defer></script>
 </head>
 <body>
-  <header><strong>AgentGate</strong><span>Local governance</span></header>
-  <main>
-    <h1>Agents and activity</h1>
-    <form id="connect">
-      <label for="token">Reviewer token</label>
-      <input id="token" type="password" required autocomplete="off">
-      <button>Connect</button>
-    </form>
-    <p id="status" role="status" aria-live="polite"></p>
-    <div id="workspace" hidden>
-      <section aria-labelledby="agents-title">
-        <div class="section-heading">
-          <h2 id="agents-title">Discovered agents</h2>
-          <button id="scan" type="button">Scan this computer</button>
-        </div>
-        <p id="agent"></p>
-        <p class="muted">The local scan checks the configured Sonar endpoint.</p>
-      </section>
-      <section aria-labelledby="rules-title">
-        <h2 id="rules-title">Sonar rules</h2>
-        <form id="rules">
-          <label for="read_file">Read project files</label>
-          <select id="read_file" name="read_file">
-            <option value="allow">Allow</option><option value="review">Require review</option><option value="deny">Block</option>
-          </select>
-          <button type="button" data-save="read_file">Save read rule</button>
-          <label for="write_file">Write project files</label>
-          <select id="write_file" name="write_file">
-            <option value="allow">Allow</option><option value="review">Require review</option><option value="deny">Block</option>
-          </select>
-          <button type="button" data-save="write_file">Save write rule</button>
-        </form>
-        <p class="muted">Rules apply inside the configured project directory.</p>
-      </section>
-      <section aria-labelledby="activity-title">
-        <h2 id="activity-title">Sonar activity</h2>
-        <div id="activity"></div>
+<a class="skip-link" href="#workspace">Skip to workspace</a>
+<header class="app-header">
+  <a class="brand" href="/" data-nav><span class="brand-mark" aria-hidden="true">a<span>g</span></span>AgentGate</a>
+  <span class="workspace-label">Agent oversight</span>
+  <div class="header-tools"><span class="environment"><span class="status-dot" aria-hidden="true"></span>Local workspace</span><button id="theme-toggle" type="button" class="secondary theme-toggle" aria-pressed="false"><span class="theme-switch" aria-hidden="true"></span>Dark theme</button></div>
+</header>
+<nav aria-label="Main navigation">
+  <a href="/" data-nav>Overview</a>
+  <a href="/agents" data-nav>Agents</a>
+  <a href="/activity" data-nav>Activity & decisions</a>
+  <a href="/rules" data-nav>Rules</a>
+  <a href="/security" data-nav>Security & compliance</a>
+</nav>
+<main id="workspace" tabindex="-1">
+  <section class="connection" aria-labelledby="access-title">
+    <div class="connection-copy"><h2 id="access-title">Reviewer access</h2><p>Connect to review requests and manage local agents.</p></div>
+    <form class="access-controls" id="connect"><label for="token" class="sr-only">Reviewer token</label><div class="connect-row"><input id="token" type="password" required autocomplete="off" placeholder="Enter reviewer token"><button>Connect</button></div></form>
+    <button id="disconnect" class="secondary" hidden>Disconnect</button><p id="status" role="status"></p>
+  </section>
+
+  <div id="workspace-data" hidden>
+    <div id="home-page">
+      <section class="page-intro"><div><p class="eyebrow">Overview</p><h1>Your agents at a glance</h1><p>Review requests, understand recent actions, and keep track of agent access.</p></div><span class="scope-note">Local activity</span></section>
+      <section class="attention-panel"><div><p class="eyebrow">Needs attention</p><h2 id="attention">Requests awaiting review</h2><p>Sensitive actions pause until a reviewer makes a decision.</p></div><a class="button-link" href="/activity?outcome=pending" data-nav>Review requests →</a></section>
+      <section class="metrics" aria-label="Recorded activity"><article><span>Awaiting review</span><strong id="pending">—</strong></article><article><span>Blocked by policy</span><strong id="denied">—</strong></article><article><span>Executed</span><strong id="executed">—</strong></article><article><span>Total actions</span><strong id="total">—</strong></article></section>
+      <div class="coverage-strip"><a href="/agents" data-nav>View registered agents →</a><p id="coverage"></p></div>
+      <section class="recent-panel"><div class="section-heading"><div><h2>Recent activity</h2><p>The three latest actions across your agents.</p></div><a href="/activity" data-nav>View all activity →</a></div><div id="recent-actions"></div></section>
+    </div>
+    <div id="agents-page" hidden>
+      <section class="page-intro"><div><p class="eyebrow">Agents</p><h1>Understand who has access</h1><p>Discover local agents and choose which to add.</p></div><span class="scope-note">This computer</span></section>
+      <section id="directory-panel"><div class="directory-toolbar"><h2>Registered agents</h2><button id="scan" type="button">Scan this computer</button></div><p id="agent-count" class="help"></p><div class="table-scroll"><table class="agent-table"><caption class="sr-only">Local agents and management status</caption><thead><tr><th scope="col">Agent & purpose</th><th scope="col">Owner</th><th scope="col">Location</th><th scope="col">Observation</th><th scope="col">Last scan</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="agent-directory"></tbody></table></div><p class="coverage-note">Enforcement applies to project file reads and writes in the managed session.</p></section>
+      <dialog id="enrollment"><h2>Add Sonar to AgentGate?</h2><p>Launch a separate managed Sonar session with its own chat history. The running standalone session stays open.</p><div class="form-actions"><button id="confirm-enroll">Add and launch Sonar</button><button id="cancel-enroll" class="secondary">Cancel</button></div></dialog>
+    </div>
+    <div id="activity-page" hidden>
+      <section class="page-intro"><div><p class="eyebrow">Activity & decisions</p><h1>Follow the decision trail</h1><p>Find what happened, understand why, and review actions that need your approval.</p></div><span class="scope-note">Latest 100 actions</span></section>
+      <form id="activity-filters" class="filter-bar"><div><label for="filter">Decision</label><select id="filter"><option value="">All decisions</option><option value="pending">Awaiting review</option><option value="denied">Blocked</option><option value="executed">Executed</option><option value="rejected">Rejected</option></select></div><div class="search-field"><label for="activity-search">Search activity</label><input id="activity-search" placeholder="Tool or file path" maxlength="100" type="search"></div><button>Apply filters</button></form>
+      <div class="section-heading result-heading"><p id="activity-count" role="status"></p><button id="refresh" class="secondary">Refresh activity</button></div><div id="actions"></div>
+    </div>
+    <div id="rules-page" hidden>
+      <section class="page-intro"><div><p class="eyebrow">Rules</p><h1>Set clear boundaries for each agent</h1><p>These rules determine which actions the gateway allows, blocks, or sends for review.</p></div><span class="scope-note">Changes take effect immediately</span></section>
+      <section class="rules-guards"><h2>Sonar project file access</h2><p>Rules apply inside the configured project directory. Changing a rule withdraws older pending authorizations.</p>
+        <form id="rules"><div class="field-inline"><label for="read_file">Read project files</label><select id="read_file"><option value="allow">Allow</option><option value="review">Require review</option><option value="deny">Block</option></select><button type="button" data-save="read_file">Save read rule</button></div>
+        <div class="field-inline"><label for="write_file">Write project files</label><select id="write_file"><option value="allow">Allow</option><option value="review">Require review</option><option value="deny">Block</option></select><button type="button" data-save="write_file">Save write rule</button></div></form>
       </section>
     </div>
-  </main>
+    <div id="security-page" hidden>
+      <section class="page-intro"><div><p class="eyebrow">Security & compliance</p><h1>Know what needs attention</h1><p>Understand agent access and review attempted actions.</p></div><span class="scope-note">Limited assessment</span></section>
+      <section class="rules-guards"><h2>Enforcement coverage</h2><p id="security-coverage"></p><p>Regulatory applicability has not been assessed for this local workflow.</p><a href="/activity" data-nav>Inspect agent activity →</a></section>
+    </div>
+  </div>
+  <footer><span>AgentGate · Local prototype</span><span>Local Sonar governance</span></footer>
+</main>
 </body>
 </html>

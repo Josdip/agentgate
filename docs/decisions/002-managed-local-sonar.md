@@ -1,22 +1,21 @@
-# 002. Give the gateway authority over managed file actions
+# 002. Govern an unmodified local Sonar runtime
 
-Integrate at Sonar's tool dispatch boundary. Managed Sonar submits a typed
-proposal over loopback and waits for AgentGate when human approval is required.
-Ordinary Sonar keeps its existing review workflow. The managed runner delegates
-file operations to AgentGate's executor and does not provide the model with
-parallel shell, browser, repository, or retrieval access.
+Discover running Sonar from its process and loopback listener. Enrollment is a
+reviewer action that starts a dedicated instance of the original application
+inside Bubblewrap. Preserve the original process and its database. Mount only
+the stock source and template, the managed session state, and the broker
+credential. The virtual project directory has no backing access to the real
+protected project.
 
-Use a distinct reviewer token and Sonar token. Discovery checks a known
-loopback endpoint, and a fresh nonce paired with an HMAC proves possession
-of the Sonar token. An unsigned assertion is discovery evidence only.
+The launcher installs a process-local adapter at Sonar's tool dispatch point.
+It submits bounded reads and writes to AgentGate and returns the final tool
+result. AgentGate is the only review control for that process. Original source
+files and standalone behavior stay intact. Disable unmanaged capabilities in
+the managed process and return a generic failure for blocked operations so the
+model can continue with independent work.
 
-Persist only proposal metadata and a fingerprint. At execution, verify the
-same payload, valid authorization, current rule revision, and a fresh claim.
-Commit the claim before touching the filesystem. This prevents duplicate
-execution. A crash between a file write and its receipt leaves an uncertain
-record for the operator to investigate. File writes replace a temporary file
-in the target directory atomically.
-
-The enforcement boundary is the integrated model tool path. Separate OS
-identities and exclusive executor filesystem permissions are required to
-enforce against arbitrary code running as the agent host's user.
+Only AgentGate's executor opens the protected project. It checks a fresh
+authorization and the exact payload before claiming execution. The current
+prototype relies on the host operator and shares the host network. Resource
+permissions tied to a separate executor identity are the production boundary
+for untrusted host processes.

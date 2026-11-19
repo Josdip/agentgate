@@ -136,7 +136,9 @@ def fingerprint(action):
     return hashlib.sha256(action.model_dump_json().encode()).hexdigest()
 
 
-def create_managed_app(database, project, agent_token, reviewer_token, sonar_port=5000):
+def create_managed_app(
+    database, project, agent_token, reviewer_token, sonar_port=5000, *, launcher=None
+):
     if (
         min(len(agent_token), len(reviewer_token)) < 32
         or agent_token == reviewer_token
@@ -157,6 +159,8 @@ def create_managed_app(database, project, agent_token, reviewer_token, sonar_por
         try:
             yield
         finally:
+            if launcher:
+                launcher.stop()
             executor.close()
 
     app = FastAPI(
@@ -196,16 +200,25 @@ def create_managed_app(database, project, agent_token, reviewer_token, sonar_por
     @app.get("/")
     @app.get("/agents")
     @app.get("/activity")
+    @app.get("/rules")
+    @app.get("/security")
     def index():
         return FileResponse(STATIC / "managed.html")
 
     @app.get("/static/{asset}")
-    def static_asset(asset: Literal["managed.css", "managed.js"]):
+    def static_asset(asset: Literal["styles.css", "theme.js", "managed.js"]):
         return FileResponse(STATIC / asset)
 
     @app.post("/api/discovery", dependencies=[reviewer])
     def scan():
-        state = discover_sonar(sonar_port, agent_token)
+        if launcher:
+            state = (
+                "managed"
+                if launcher.running()
+                else ("discovered" if launcher.discover() else "offline")
+            )
+        else:
+            state = discover_sonar(sonar_port, agent_token)
         with ledger.transaction() as db:
             if state != "offline" or db.execute("SELECT 1 FROM discovery").fetchone():
                 db.execute(
@@ -214,12 +227,42 @@ def create_managed_app(database, project, agent_token, reviewer_token, sonar_por
                 )
         return {"state": state}
 
+    @app.post("/api/enrollment", dependencies=[reviewer])
+    def enroll():
+        if launcher is None:
+            raise HTTPException(404, "Enrollment is unavailable.")
+        with ledger.transaction() as db:
+            found = db.execute("SELECT state FROM discovery").fetchone()
+            if found is None or found["state"] not in {"discovered", "managed"}:
+                raise HTTPException(409, "Scan and discover Sonar before adding it.")
+        try:
+            launcher.enroll()
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from None
+        with ledger.transaction() as db:
+            db.execute("UPDATE discovery SET state='managed',scanned=? WHERE id=1", (time.time(),))
+        return {"state": "managed", "url": launcher.url}
+
     @app.get("/api/overview", dependencies=[reviewer])
     def overview():
         with ledger.transaction() as db:
             found = db.execute("SELECT state,scanned FROM discovery").fetchone()
+            agents = [{"name": "Sonar", **dict(found)}] if found else []
+            if launcher and agents and agents[0]["state"] == "managed":
+                agents[0]["state"] = "managed" if launcher.running() else "offline"
+                if launcher.running():
+                    agents[0]["url"] = launcher.url
             return {
-                "agents": [{"name": "Sonar", **dict(found)}] if found else [],
+                "agents": agents,
+                "counts": dict(
+                    db.execute(
+                        """SELECT COUNT(*) AS total,
+                        COUNT(CASE WHEN status='pending' AND created>? THEN 1 END) AS pending,
+                        COUNT(CASE WHEN status='denied' THEN 1 END) AS denied,
+                        COUNT(CASE WHEN status='executed' THEN 1 END) AS executed FROM actions""",
+                        (time.time() - TTL,),
+                    ).fetchone()
+                ),
                 "rules": [dict(row) for row in db.execute("SELECT * FROM rules ORDER BY tool")],
                 "activity": [
                     ledger.public(row)
@@ -243,6 +286,8 @@ def create_managed_app(database, project, agent_token, reviewer_token, sonar_por
 
     @app.put("/api/proposals/{request_id}", dependencies=[agent])
     def submit(request_id: UUID, action: Proposal):
+        if launcher and not launcher.running():
+            raise HTTPException(403, "No managed Sonar instance is running.")
         digest = fingerprint(action)
         with ledger.transaction() as db:
             existing = db.execute("SELECT * FROM actions WHERE id=?", (str(request_id),)).fetchone()
@@ -293,6 +338,8 @@ def create_managed_app(database, project, agent_token, reviewer_token, sonar_por
 
     @app.post("/api/proposals/{request_id}/execute", dependencies=[agent])
     def execute(request_id: UUID, action: Proposal):
+        if launcher and not launcher.running():
+            raise HTTPException(403, "No managed Sonar instance is running.")
         action_id = str(request_id)
         with ledger.transaction() as db:
             record = ledger.public(ledger.action(db, action_id))

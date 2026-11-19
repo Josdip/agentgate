@@ -140,3 +140,53 @@ def test_scope_refuses_private_targets_symlinks_and_hardlinks(gate, tmp_path):
             ).status_code
             == 422
         )
+
+
+def test_discovery_requires_explicit_enrollment_and_active_launcher(tmp_path):
+    class Launcher:
+        url = "http://127.0.0.1:5002"
+        active = False
+
+        def discover(self):
+            return True
+
+        def running(self):
+            return self.active
+
+        def enroll(self):
+            self.active = True
+
+        def stop(self):
+            self.active = False
+
+    launcher = Launcher()
+    root = tmp_path / "project"
+    root.mkdir()
+    with TestClient(
+        create_managed_app(
+            tmp_path / "audit.sqlite3", root, AGENT_TOKEN, REVIEWER_TOKEN, launcher=launcher
+        )
+    ) as client:
+        assert client.post("/api/enrollment", headers=REVIEWER).status_code == 409
+        assert client.post("/api/discovery", headers=REVIEWER).json()["state"] == "discovered"
+        assert not launcher.active
+        assert client.post("/api/enrollment", headers=AGENT).status_code == 401
+        assert (
+            client.put(
+                f"/api/proposals/{uuid4()}",
+                json={"tool": "read_file", "path": "notes.txt"},
+                headers=AGENT,
+            ).status_code
+            == 403
+        )
+        assert client.post("/api/enrollment", headers=REVIEWER).json() == {
+            "state": "managed",
+            "url": launcher.url,
+        }
+        assert launcher.active
+        assert (
+            client.get("/api/overview", headers=REVIEWER).json()["agents"][0]["state"] == "managed"
+        )
+        assert 'id="theme-toggle"' in client.get("/agents").text
+        assert client.get("/static/theme.js").status_code == 200
+    assert not launcher.active

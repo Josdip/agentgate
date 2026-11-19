@@ -1,17 +1,22 @@
 'use strict';
 
 const byId = id => document.getElementById(id);
-const seen = new Map();
-let token = '';
-let loading = false;
-
+const tools = {read_file: 'Read file', write_file: 'Write file'};
 const states = {
   pending: 'Awaiting review', ready: 'Authorized · awaiting execution', denied: 'Blocked by rule',
   rejected: 'Rejected by reviewer', executing: 'Execution started · receipt pending',
-  executed: 'Executed', failed: 'Execution failed', expired: 'Expired', superseded: 'Authorization withdrawn · rule changed',
+  executed: 'Executed', failed: 'Execution failed', expired: 'Expired',
+  superseded: 'Authorization withdrawn · rule changed',
 };
-const tools = {read_file: 'Read file', write_file: 'Write file'};
-const announce = text => { byId('status').textContent = text; };
+const pages = {'/': 'home', '/agents': 'agents', '/activity': 'activity', '/rules': 'rules', '/security': 'security'};
+const announce = message => { byId('status').textContent = message; };
+let token = '';
+let snapshot = null;
+let filter = '';
+let search = '';
+let generation = 0;
+let lastView = '';
+let busy = false;
 
 async function api(path, method = 'GET', body) {
   const response = await fetch(path, {
@@ -24,92 +29,131 @@ async function api(path, method = 'GET', body) {
   return data;
 }
 
-function text(tag, value) {
+function element(tag, text, className) {
   const node = document.createElement(tag);
-  node.textContent = value;
+  node.textContent = text;
+  if (className) node.className = className;
   return node;
 }
 
-function renderActivity(actions) {
-  const activity = byId('activity');
-  for (const id of seen.keys()) {
-    if (!actions.some(action => action.id === id)) {
-      seen.get(id).node.remove();
-      seen.delete(id);
-    }
+function button(label, execute, style) {
+  const node = element('button', label, style);
+  node.type = 'button';
+  node.addEventListener('click', async () => {
+    node.disabled = true;
+    try { await execute(); }
+    catch (error) { announce(error.message); }
+    finally { node.disabled = false; }
+  });
+  return node;
+}
+
+function renderAction(action) {
+  const item = element('article', '', 'action');
+  const head = element('div', '', 'action-head');
+  head.append(element('strong', 'Sonar · ' + tools[action.tool] + ' · ' + action.path),
+    element('span', states[action.status], 'badge ' + action.status));
+  item.append(head, element('p', 'Rule: ' + action.decision + ' · ' +
+    new Date(action.created * 1000).toLocaleString(), 'help'));
+  if (action.size !== null) {
+    item.append(element('p', action.size + ' bytes · Proposal SHA-256 ' + action.digest, 'help'));
   }
-  if (!actions.length) {
-    activity.textContent = 'No managed tool actions yet.';
+  if (action.status === 'pending') {
+    const review = element('div', '', 'review');
+    for (const approve of [true, false]) {
+      review.append(button(approve ? 'Approve request' : 'Reject request', async () => {
+        await api('/api/proposals/' + action.id + '/review', 'POST', {approve});
+        announce(approve ? 'Request authorized. Waiting for execution.' : 'Request rejected.');
+        await refresh();
+      }, approve ? '' : 'reject'));
+    }
+    item.append(review);
+  }
+  return item;
+}
+
+function renderDirectory(agent) {
+  const directory = byId('agent-directory');
+  if (!agent) {
+    byId('agent-count').textContent = 'No agents discovered yet.';
+    directory.replaceChildren();
     return;
   }
-  if (!seen.size) activity.textContent = '';
-  for (const action of [...actions].reverse()) {
-    const existing = seen.get(action.id);
-    if (existing?.state === action.status) continue;
-    const node = text('article', '');
-    node.append(
-      text('strong', tools[action.tool] + ' · ' + action.path),
-      text('p', states[action.status] + ' · Rule ' + action.decision + ' · ' + new Date(action.created * 1000).toLocaleString())
-    );
-    if (action.size !== null) {
-      node.append(text('p', action.size + ' bytes · Proposal SHA-256 ' + action.digest));
-    }
-    if (action.status === 'pending') {
-      for (const approve of [true, false]) {
-        const button = text('button', approve ? 'Approve request' : 'Reject request');
-        button.type = 'button';
-        button.addEventListener('click', async () => {
-          const buttons = [...node.querySelectorAll('button')];
-          buttons.forEach(item => { item.disabled = true; });
-          try {
-            await api('/api/proposals/' + action.id + '/review', 'POST', {approve});
-            announce(approve ? 'Request authorized. Waiting for execution.' : 'Request rejected.');
-            await refresh();
-          } catch (error) {
-            announce(error.message);
-          } finally {
-            buttons.forEach(item => { item.disabled = false; });
-          }
-        });
-        node.append(button);
-      }
-    }
-    if (existing) {
-      const focused = existing.node.contains(document.activeElement);
-      existing.node.replaceWith(node);
-      if (focused) {
-        node.tabIndex = -1;
-        node.focus();
-      }
-    } else {
-      activity.prepend(node);
-    }
-    seen.set(action.id, {node, state: action.status});
+  const state = {discovered: 'Discovered · awaiting enrollment', managed: 'Managed', offline: 'Unreachable'};
+  const row = element('tr', '');
+  for (const value of ['Sonar · Local AI assistant', 'Local operator', 'This computer', state[agent.state],
+    new Date(agent.scanned * 1000).toLocaleString()]) row.append(element('td', value));
+  const cell = element('td', '');
+  if (agent.state === 'discovered') {
+    cell.append(button('Add Sonar', () => byId('enrollment').showModal()));
+  }
+  if (agent.url) {
+    const link = element('a', 'Open managed Sonar');
+    link.href = agent.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    cell.append(link);
+  }
+  row.append(cell);
+  directory.replaceChildren(row);
+  byId('agent-count').textContent = '1 agent';
+}
+
+function render() {
+  const page = pages[location.pathname] || 'home';
+  for (const name of Object.values(pages)) byId(name + '-page').hidden = name !== page;
+  for (const link of document.querySelectorAll('nav [data-nav]')) {
+    if (pages[new URL(link.href).pathname] === page) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+  if (!snapshot) return;
+  const {agents, activity, counts} = snapshot;
+  const agent = agents[0];
+  const view = JSON.stringify([page, page === 'agents' ? agent : [agent, activity, counts, filter, search]]);
+  if (view === lastView) return;
+  lastView = view;
+  if (page === 'agents') renderDirectory(agent);
+  if (page === 'home') {
+    for (const status of ['pending', 'denied', 'executed', 'total']) byId(status).textContent = counts[status];
+    byId('attention').textContent = counts.pending + ' requests awaiting review';
+    byId('coverage').textContent = agent?.state === 'managed' ? 'Sonar project files are governed.' : 'No managed agent is running.';
+    byId('recent-actions').replaceChildren(...activity.slice(0, 3).map(renderAction));
+  }
+  if (page === 'activity') {
+    const actions = activity.filter(action => (!filter || action.status === filter) &&
+      (!search || (action.tool + ' ' + action.path).toLowerCase().includes(search)));
+    byId('activity-count').textContent = actions.length + ' actions';
+    byId('actions').replaceChildren(...actions.map(renderAction));
+  }
+  if (page === 'security') {
+    byId('security-coverage').textContent = agent?.state === 'managed'
+      ? 'The managed Sonar session enforces project file read and write rules.'
+      : 'No managed Sonar session is running.';
   }
 }
 
 async function refresh(loadRules = false) {
-  if (loading) return;
-  loading = true;
-  try {
-    const data = await api('/api/overview');
-    const agent = data.agents[0];
-    const descriptions = {
-      managed: 'Sonar · Managed. Pairing verified at last scan.',
-      discovered: 'Sonar · Discovered. The runtime identified itself without verified pairing.',
-      offline: 'Sonar · Unreachable at last scan.',
-    };
-    byId('agent').textContent = agent
-      ? descriptions[agent.state] + ' ' + new Date(agent.scanned * 1000).toLocaleString()
-      : 'No agents discovered yet.';
-    if (loadRules) {
-      for (const rule of data.rules) byId(rule.tool).value = rule.mode;
-    }
-    renderActivity(data.activity);
-  } finally {
-    loading = false;
-  }
+  const current = generation;
+  const data = await api('/api/overview');
+  if (current !== generation) return;
+  snapshot = data;
+  if (loadRules) for (const rule of data.rules) byId(rule.tool).value = rule.mode;
+  render();
 }
+
+function navigate() {
+  filter = new URLSearchParams(location.search).get('outcome') || '';
+  byId('filter').value = filter;
+  render();
+}
+document.addEventListener('click', event => {
+  const link = event.target.closest('[data-nav]');
+  if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  history.pushState({}, '', link.href);
+  navigate();
+});
+window.addEventListener('popstate', navigate);
 
 byId('connect').addEventListener('submit', async event => {
   event.preventDefault();
@@ -118,43 +162,72 @@ byId('connect').addEventListener('submit', async event => {
     await refresh(true);
     byId('token').value = '';
     byId('connect').hidden = true;
-    byId('workspace').hidden = false;
+    byId('disconnect').hidden = false;
+    byId('workspace-data').hidden = false;
     announce('Reviewer connected.');
   } catch (error) {
     token = '';
     announce(error.message);
   }
 });
-
-byId('scan').addEventListener('click', async event => {
-  const button = event.currentTarget;
-  button.disabled = true;
-  try {
-    const result = await api('/api/discovery', 'POST');
-    announce(result.state === 'offline' ? 'No compatible Sonar endpoint responded.' : 'Sonar responded to the scan.');
-    await refresh();
-  } catch (error) {
-    announce(error.message);
-  } finally {
-    button.disabled = false;
-  }
+byId('disconnect').addEventListener('click', () => {
+  generation++;
+  token = '';
+  snapshot = null;
+  lastView = '';
+  byId('workspace-data').hidden = true;
+  byId('disconnect').hidden = true;
+  byId('connect').hidden = false;
+  announce('Disconnected.');
 });
 
-for (const button of document.querySelectorAll('[data-save]')) {
-  button.addEventListener('click', async () => {
-    const tool = button.dataset.save;
-    button.disabled = true;
+for (const [id, action] of [
+  ['scan', async () => {
+    const result = await api('/api/discovery', 'POST');
+    announce(result.state === 'offline' ? 'No running standalone Sonar was found.' : 'Sonar found.');
+    await refresh();
+  }],
+  ['confirm-enroll', async () => {
+    byId('enrollment').close();
+    announce('Starting managed Sonar…');
+    await api('/api/enrollment', 'POST');
+    await refresh();
+    announce('Managed Sonar is ready. Open it from the Agents page.');
+  }],
+  ['refresh', () => refresh()],
+]) {
+  byId(id).addEventListener('click', async event => {
+    const control = event.currentTarget;
+    control.disabled = true;
+    try { await action(); }
+    catch (error) { announce(error.message); }
+    finally { control.disabled = false; }
+  });
+}
+byId('cancel-enroll').addEventListener('click', () => byId('enrollment').close());
+byId('activity-filters').addEventListener('submit', event => {
+  event.preventDefault();
+  filter = byId('filter').value;
+  search = byId('activity-search').value.toLowerCase();
+  render();
+});
+for (const control of document.querySelectorAll('[data-save]')) {
+  control.addEventListener('click', async () => {
+    const tool = control.dataset.save;
+    control.disabled = true;
     try {
       await api('/api/rules/' + tool, 'PUT', {mode: byId(tool).value});
       announce(tools[tool] + ' rule saved.');
-    } catch (error) {
-      announce(error.message);
-    } finally {
-      button.disabled = false;
-    }
+      await refresh();
+    } catch (error) { announce(error.message); }
+    finally { control.disabled = false; }
   });
 }
-
-setInterval(() => {
-  if (token && !byId('workspace').hidden) refresh().catch(error => announce(error.message));
-}, 2500);
+navigate();
+setInterval(async () => {
+  if (!token || busy) return;
+  busy = true;
+  try { await refresh(); }
+  catch (error) { if (token) announce(error.message); }
+  finally { busy = false; }
+}, 3000);
