@@ -13,7 +13,8 @@ a proposal, its authorization, and the outcome of execution.
 ## Run locally
 
 With Sonar running, use this command in the AgentGate checkout and open the
-one-use reviewer link it prints.
+one-use reviewer link it prints. Each launch starts a fresh demo with a new
+token and empty inventory.
 
 ```sh
 ./start-local

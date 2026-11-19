@@ -40,19 +40,25 @@ def private_token(path):
     return path
 
 
-def setup_paths(environ):
-    if all(
-        environ.get(key)
-        for key in (
-            "AGENTGATE_DB",
-            "AGENTGATE_PROJECT",
-            "AGENTGATE_SONAR_TOKEN_FILE",
-            "AGENTGATE_REVIEWER_TOKEN_FILE",
-        )
-    ):
+STATE_KEYS = (
+    "AGENTGATE_DB",
+    "AGENTGATE_PROJECT",
+    "AGENTGATE_SONAR_TOKEN_FILE",
+    "AGENTGATE_REVIEWER_TOKEN_FILE",
+)
+
+
+def setup_paths(environ, *, fresh_session=False):
+    if not fresh_session and all(environ.get(key) for key in STATE_KEYS):
         return
     default = Path(environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "agentgate"
     home = Path(environ.get("AGENTGATE_HOME", default)).expanduser()
+    if fresh_session:
+        sessions = home / "demo-sessions"
+        sessions.mkdir(mode=0o700, parents=True, exist_ok=True)
+        home = Path(tempfile.mkdtemp(prefix="demo-", dir=sessions))
+        for key in STATE_KEYS:
+            environ.pop(key, None)
     home.mkdir(mode=0o700, parents=True, exist_ok=True)
     if "AGENTGATE_PROJECT" not in environ:
         project = home / "project"

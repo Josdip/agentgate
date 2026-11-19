@@ -8,4 +8,4 @@ fi
 if ! .venv/bin/python -c 'import fastapi, uvicorn, pydantic' >/dev/null 2>&1; then
   .venv/bin/python -m pip install --disable-pip-version-check -r requirements-dev.lock
 fi
-exec .venv/bin/python -m agentgate --setup-sandbox --first-run-link "$@"
+exec .venv/bin/python -m agentgate --setup-sandbox --first-run-link --fresh-session "$@"

@@ -8,8 +8,11 @@ leave it open. From a fresh AgentGate checkout, run:
 ```
 
 The launcher creates the Python 3.12 environment and installs pinned
-dependencies on first use. Local AgentGate data and credentials default to
-`~/.local/share/agentgate` with a private sample project. It uses port 8001 if
+dependencies on first use. Every launch creates a fresh inventory, audit
+history, sample project, and reviewer and Sonar tokens in a private directory
+under `~/.local/share/agentgate/demo-sessions`. Scan and enroll again on each
+launch. Reopening or refreshing the browser while AgentGate is running stays
+in that launch's session. The launcher uses port 8001 if
 available and prints the address it selected. Downloaded dependencies and the
 Ollama model are separate. Sonar needs Ollama and an installed tool-capable model.
 
@@ -37,7 +40,9 @@ distribution's Bubblewrap package before starting. [Ubuntu AppArmor notes](https
    blocked. Change policies in **Rules**.
 
 Stopping AgentGate stops its managed Sonar session. It leaves standalone
-Sonar open. Set `AGENTGATE_HOME` to use a separate AgentGate workspace. The
+Sonar open. Previous demo files remain on disk. Set `AGENTGATE_HOME` to
+choose the parent directory for new demos. For persistent AgentGate state across
+restarts, run `.venv/bin/python -m agentgate` after sandbox setup. The
 runtime detects Sonar's source and chat database from the local process.
 Set `AGENTGATE_SONAR_SOURCE` to restrict discovery to a specific checkout.
 

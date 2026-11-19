@@ -19,13 +19,18 @@ def main(argv=()):
     parser.add_argument(
         "--first-run-link", action="store_true", help="Print a one-use local reviewer link."
     )
+    parser.add_argument(
+        "--fresh-session",
+        action="store_true",
+        help="Start an empty demo with new credentials and its own project.",
+    )
     options = parser.parse_args(argv)
     first_run_code = secrets.token_urlsafe(32) if options.first_run_link else None
     try:
         if options.setup_sandbox:
             setup_sandbox()
         env = dict(os.environ)
-        setup_paths(env)
+        setup_paths(env, fresh_session=options.fresh_session)
         database = Path(env["AGENTGATE_DB"])
         database.parent.mkdir(parents=True, exist_ok=True)
         gateway_port = int(env["AGENTGATE_PORT"]) if "AGENTGATE_PORT" in env else local_port(8001)
