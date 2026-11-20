@@ -11,7 +11,7 @@ in this demo is Sonar project file reads and writes.
 
 | Track | Documented | Implemented | Verification and next gap |
 | --- | --- | --- | --- |
-| Local Sonar | [Setup and isolation](local-sonar-governance.md) | Local discovery, isolated launch, history snapshot, file policies, human review and audit | Live Ollama onboarding and file enforcement were verified in the first-run milestone. Repeat the operator walkthrough on this branch. |
+| Local Sonar | [Setup and isolation](local-sonar-governance.md) | Local discovery, isolated launch, history snapshot, file policies, human review and audit | Live Ollama onboarding and file enforcement passed in the first-run milestone. The operator also verified the revised managed Sonar file flow on this branch. |
 | Chrome | [Extension setup](external-discovery.md#chatgpt-in-chrome) | A one-use discovery report, explicit enrollment, revocable credential scoped to future manual reports | An operator verified discovery, enrollment, and the visible enrolled report update in Chrome. The report receipt also passed HTTP automation. Tool actions have no enforcement integration. |
 | AWS Bedrock | [CLI and demo mode](external-discovery.md#aws-bedrock-agents) | Read-only discovery and enrollment with an account and region recheck. Explicit demo fixture for offline presentations | Tests verify the fixture and mocked inventory client. An authorized AWS account and live enrollment have not been verified. Tool actions have no enforcement integration. |
 
@@ -30,9 +30,7 @@ The current launcher and data boundary are documented in
 
 ## Next increments
 
-- **Local:** Repeat history migration and denied-action checks across
-  supported Linux setups. Track connector freshness and verify each governed
-  tool separately.
+- **Local:** Enforce write denial across the enrolled agent’s execution boundary by default, with optional folder-specific scopes. Normal user requests should need no special syntax. Verify attempted writes through each available route, including indirect writes by subprocesses. Get architectural approval before changing the enforcement boundary. Continue history and isolation checks across supported Linux setups.
 - **Browser:** Validate the unpacked extension in Chrome, then add an
   organization-approved browser deployment path. Evaluate governance at one
   supported external tool endpoint.
