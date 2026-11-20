@@ -55,6 +55,10 @@ function renderAction(action) {
     element('span', action.decision === "invalid request" ? "Blocked · invalid request" : states[action.status], 'badge ' + action.status));
   item.append(head, element('p', 'Rule: ' + action.decision + ' · ' +
     new Date(action.created * 1000).toLocaleString(), 'help'));
+  if (action.reviewed_at) {
+    item.append(element('p', 'Review: ' + action.review_decision + ' · ' + action.reviewer +
+      ' · ' + new Date(action.reviewed_at * 1000).toLocaleString(), 'help'));
+  }
   if (action.size !== null) {
     item.append(element('p', action.size + ' bytes · Proposal SHA-256 ' + action.digest, 'help'));
   }
