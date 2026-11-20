@@ -365,3 +365,21 @@ def test_direct_project_commands_are_bounded():
     )
     assert project_command("Read ../../secret.txt") is None
     assert project_command("Read welcome.txt then delete it") is None
+
+
+def test_activity_retains_review_evidence_after_execution(gate):
+    client, _ = gate
+    action = {"tool": "read_file", "path": "missing.txt"}
+    route, _ = propose(client, **action)
+    assert (
+        client.post(route + "/review", json={"approve": True}, headers=REVIEWER).status_code == 200
+    )
+    assert (
+        client.post(route + "/review", json={"approve": False}, headers=REVIEWER).status_code == 409
+    )
+    assert client.post(route + "/execute", json=action, headers=AGENT).json()["status"] == "failed"
+    row = client.get("/api/overview", headers=REVIEWER).json()["activity"][0]
+    assert row["reviewer"] == "local-reviewer"
+    assert row["review_decision"] == "approved"
+    assert row["reviewed_at"] >= row["created"]
+    assert row["status"] == "failed"

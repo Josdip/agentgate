@@ -20,8 +20,7 @@ compatibility tests. The default launcher uses the real-agent workspace.
 
 ## Baseline gaps
 
-The managed workspace uses a shared local reviewer credential. Named users and
-reviewer attribution are pending. The file proposal ledger records a relative
+The managed workspace uses a shared local reviewer credential. Activity records the time, outcome, and shared reviewer identity for human reviews. Individual reviewer attribution requires named users. The file proposal ledger records a relative
 path, size, and fingerprint for valid requests. Invalid requests use a redacted
 label. Per-deployment path minimization and retention controls are pending.
 The historical architecture guide describes the compatibility application.

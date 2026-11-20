@@ -138,6 +138,10 @@ class Ledger:
                     digest TEXT NOT NULL, size INTEGER, created REAL NOT NULL,
                     decision TEXT NOT NULL, status TEXT NOT NULL, revision INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS action_reviews (
+                    action_id TEXT PRIMARY KEY, reviewer TEXT NOT NULL,
+                    decision TEXT NOT NULL, reviewed_at REAL NOT NULL
+                );
                 """)
 
     @contextmanager
@@ -521,7 +525,9 @@ def create_managed_app(
                 "rules": [dict(row) for row in db.execute("SELECT * FROM rules ORDER BY tool")],
                 "activity": [
                     ledger.public(row)
-                    for row in db.execute("SELECT * FROM actions ORDER BY rowid DESC LIMIT 100")
+                    for row in db.execute("""SELECT a.*, r.reviewer, r.decision AS review_decision, r.reviewed_at
+                        FROM actions a LEFT JOIN action_reviews r ON r.action_id=a.id
+                        ORDER BY a.rowid DESC LIMIT 100""")
                 ],
             }
 
@@ -589,6 +595,15 @@ def create_managed_app(
                 raise HTTPException(409, "Rule changed. Reject this request and submit a new one.")
             updated = "ready" if review.approve else "rejected"
             db.execute("UPDATE actions SET status=? WHERE id=?", (updated, str(request_id)))
+            db.execute(
+                "INSERT INTO action_reviews VALUES (?,?,?,?)",
+                (
+                    str(request_id),
+                    "local-reviewer",
+                    "approved" if review.approve else "rejected",
+                    time.time(),
+                ),
+            )
             return {"status": updated}
 
     @app.post("/api/proposals/{request_id}/execute", dependencies=[agent])
