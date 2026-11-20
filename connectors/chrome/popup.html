@@ -12,9 +12,11 @@
   <form id="report">
     <label for="gateway">AgentGate address</label>
     <input id="gateway" type="url" value="http://127.0.0.1:8001" required>
-    <label for="code">Discovery code</label>
-    <input id="code" type="password" autocomplete="off" required>
-    <button>Report active tab</button>
+    <label for="code">Discovery or enrollment code</label>
+    <input id="code" type="password" autocomplete="off">
+    <button value="observe">Report active tab</button>
+    <button value="enroll">Enroll Chrome</button>
+    <button value="paired">Report as enrolled</button>
   </form>
   <p id="result" role="status"></p>
 </body>

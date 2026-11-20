@@ -1,35 +1,42 @@
-# Roadmap
+# Roadmap and support matrix
 
-Product direction: [simple, evidence-based agent oversight for small and medium businesses](product-direction.md).
+## First end-to-end milestone
 
-## Delivered: local governance foundation
+A fresh local demo discovers and enrolls Sonar, ChatGPT in Chrome, and a
+clearly labeled AWS Bedrock fixture. The inventory distinguishes discovery,
+enrollment, and coverage. Demonstrate one authorized read and one blocked
+write through Sonar and inspect its metadata trail. Browser and cloud
+enrollment are inventory workflows. AgentGate's only governed integration
+in this demo is Sonar project file reads and writes.
 
-Deterministic policy, agent/reviewer credentials, persistent audit, one-time approvals, six individually runnable dashboard cases, auto-refresh, three seeded agent profiles, versioned declared model inventory, and policy-derived tool permissions. Tools remain synthetic. A real-agent adapter scaffold is available; no model integration is connected by default.
+| Track | Documented | Implemented | Verification and next gap |
+| --- | --- | --- | --- |
+| Local Sonar | [Setup and isolation](local-sonar-governance.md) | Local discovery, isolated launch, history snapshot, file policies, human review and audit | Live Ollama onboarding and file enforcement passed in the first-run milestone. The operator also verified the revised managed Sonar file flow on this branch. |
+| Chrome | [Extension setup](external-discovery.md#chatgpt-in-chrome) | A one-use discovery report, explicit enrollment, revocable credential scoped to future manual reports | An operator verified discovery, enrollment, and the visible enrolled report update in Chrome. The report receipt also passed HTTP automation. Tool actions have no enforcement integration. |
+| AWS Bedrock | [CLI and demo mode](external-discovery.md#aws-bedrock-agents) | Read-only discovery and enrollment with an account and region recheck. Explicit demo fixture for offline presentations | Tests verify the fixture and mocked inventory client. An authorized AWS account and live enrollment have not been verified. Tool actions have no enforcement integration. |
 
-## Delivered: initial multi-agent business view
+The synthetic support, sales and finance application remains available for
+compatibility tests. The default launcher uses the real-agent workspace.
 
-Dedicated inventory/profile pages, an overview limited to three recent actions, and a separate server-filtered paginated activity page. Support, Sales, and Finance have distinct effective permissions, versioned metadata, and fourteen total demo cases. Optional credentials bind direct API calls to their registered identities. Deployment locations remain simulated.
+## Baseline gaps
 
-## Next: broader registry and business workflows
+The managed workspace uses a shared local reviewer credential. Named users and
+reviewer attribution are pending. The file proposal ledger records a relative
+path, size, and fingerprint for valid requests. Invalid requests use a redacted
+label. Per-deployment path minimization and retention controls are pending.
+The historical architecture guide describes the compatibility application.
+The current launcher and data boundary are documented in
+[Local Sonar governance](local-sonar-governance.md).
 
-Extend the seeded registry with onboarding, lifecycle management, verified cloud/endpoint/browser sources, and reporting freshness. Add a company overview showing known/active agents and coverage gaps. Bind credentials to individual agents before accepting multi-agent events; never trust caller-supplied identity. Scope profiles and activity per agent and retain the existing support-agent demo data.
+## Next increments
 
-Show configured tool/model connections separately from verified and observed usage. Translate activity into concise business language with technical evidence available on demand. Add a “Needs attention” workflow for consequential decisions.
-
-## Next: explainable risk
-
-Assess configured exposure and observed behavior separately. Use Low/Medium/High/Unknown with explanations, timestamps, source coverage, and suggested actions. Persist versioned assessment inputs/results; distinguish blocked attempts from completed actions. Add scenario-based evaluation of risk labels and false positives. No telemetry must not imply safety.
-
-## Real-agent showcase integration
-
-Implement `ShowcaseAgent.next_action` in `examples/real_agent_demo.py`, configure a provider outside the browser, and route tool proposals through `GatewayClient`. Begin with one real support agent and synthetic tools. Demonstrate malicious instructions in retrieved content and record actual observed outcomes. Evaluate realistic boundaries without claiming universal prompt-injection detection.
-
-The dashboard integration area is a placeholder with setup guidance, not a process launcher or connection monitor. See [the integration guide](real-agent-integration.md).
-
-## Broader deployment coverage
-
-Add a cloud connector, then endpoint and browser reporting incrementally. For each source, document discovery prerequisites, stable identity mapping, deduplication, permission requirements, telemetry freshness, and observation versus enforcement capabilities. Do not imply complete company discovery from gateway traffic alone.
-
-## Service hardening and product validation
-
-Tenant isolation, PostgreSQL migrations, OIDC/RBAC, scoped short-lived credentials, approval expiry, retention controls, rate limits, deployment and backups. Add idempotency and durable external-side-effect processing before real business tools. Validate onboarding and business terminology with prospective SMB users; publish reproducible evaluation results and an honest portfolio walkthrough.
+- **Local:** Enforce write denial across the enrolled agent’s execution boundary by default, with optional folder-specific scopes. Normal user requests should need no special syntax. Verify attempted writes through each available route, including indirect writes by subprocesses. Get architectural approval before changing the enforcement boundary. Continue history and isolation checks across supported Linux setups.
+- **Browser:** Validate the unpacked extension in Chrome, then add an
+  organization-approved browser deployment path. Evaluate governance at one
+  supported external tool endpoint.
+- **Cloud:** Verify authorized Bedrock discovery and enrollment against a live
+  account. Select one protected tool with an attributable workload identity.
+- **Shared administration:** Add named users and reviewer roles, durable
+  connector identities and freshness, manual registration, contextual policy
+  precedence, and audit privacy coverage. Threat indicator and anomaly work
+  follows reliable metadata collection. SSO and multi-tenancy remain future work.

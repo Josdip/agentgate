@@ -1,4 +1,4 @@
-# Browser and cloud discovery preview
+# Browser and cloud enrollment preview
 
 These connectors add inventory entries. Enforcement and review currently
 cover the managed Sonar file tools. A browser report or Bedrock catalog entry
@@ -18,6 +18,13 @@ does not grant permission to inspect conversations or control cloud tools.
    after you click it. It sends a service label without the full URL,
    conversations, cookies, credentials, or browser history.
 
+5. In the ChatGPT inventory row, select **Enroll Chrome**. Copy the new
+   enrollment code into the extension and select **Enroll Chrome** there.
+   The extension stores a credential for that local AgentGate address.
+   **Report as enrolled** shows a receipt time in the popup. The row shows
+   **Enrolled report received** and updates its timestamp. **Revoke Chrome** invalidates
+   that credential. A fresh AgentGate demo requires new enrollment.
+
 This is an operator-initiated report from a browser with the connector
 installed. It does not independently verify account ownership or whether a
 specific hosted agent is active.
@@ -34,6 +41,16 @@ specific hosted agent is active.
    the account and refreshes that account and region's inventory. The previous
    inventory remains intact if the scan fails. The current limit is 1,000
    Bedrock Agents per account and region.
+
+4. Select **Enroll agent** on a discovered row. AgentGate checks the same
+   account, region, and agent against the AWS CLI again before saving it.
+   **Revoke enrollment** removes the local inventory binding.
+
+### Offline demo fixture
+
+Run `AGENTGATE_DEMO_BEDROCK=1 ./start-local`. Enter `us-east-1` on the
+**Agents** page, scan, and enroll **Example Bedrock Agent**. The dashboard
+labels it **Demo fixture**. This flow makes no calls to AWS.
 
 AgentGate stores IDs, names, provider statuses, AWS account and region, and
 the discovery timestamp. It uses the existing AWS CLI session and does not

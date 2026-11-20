@@ -103,8 +103,34 @@ function renderDirectory(agent, externalAgents) {
     const row = element('tr', '');
     const location = observed.connector === 'chrome' ? 'Chrome · ChatGPT' : 'AWS Bedrock · ' + observed.scope;
     for (const value of [observed.name, '—', location,
-      'Discovered · ' + observed.provider_status, new Date(observed.scanned * 1000).toLocaleString(),
-      'Inventory only']) row.append(element('td', value));
+      (observed.enrolled ? 'Enrolled · ' : 'Discovered · ') + observed.provider_status,
+      new Date(observed.scanned * 1000).toLocaleString(undefined, {
+        year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+        second: 'numeric', fractionalSecondDigits: 3,
+      })]) row.append(element('td', value));
+    const controls = element('td', 'Inventory only ');
+    if (observed.connector === 'chrome') {
+      controls.append(button(observed.enrolled ? 'Revoke Chrome' : 'Enroll Chrome', async () => {
+        if (observed.enrolled) {
+          await api('/api/connectors/chrome/enrollment', 'DELETE');
+          announce('Chrome enrollment revoked.');
+          await refresh();
+        } else {
+          await showChromeCode(true);
+        }
+      }));
+    } else {
+      controls.append(button(observed.enrolled ? 'Revoke enrollment' : 'Enroll agent', async () => {
+        const region = observed.scope.split(' · ').at(-1);
+        await api('/api/connectors/bedrock/enrollment', observed.enrolled ? 'DELETE' : 'POST', {
+          region, scope: observed.scope, agent_id: observed.external_id,
+          profile: byId('bedrock-profile').value.trim(),
+        });
+        announce(observed.enrolled ? 'Bedrock enrollment revoked.' : 'Bedrock agent enrolled for inventory.');
+        await refresh();
+      }));
+    }
+    row.append(controls);
     rows.push(row);
   }
   directory.replaceChildren(...rows);
@@ -150,6 +176,9 @@ async function refresh(loadRules = false) {
   const data = await api('/api/overview');
   if (current !== generation) return;
   snapshot = data;
+  byId('bedrock-source').textContent = data.bedrock_fixture
+    ? 'Demo fixture · No AWS account is queried.'
+    : 'Scan one region using the AWS CLI session on this computer.';
   byId("external-connectors").hidden = !Array.isArray(data.external_agents);
   if (loadRules) for (const rule of data.rules) byId(rule.tool).value = rule.mode;
   render();
@@ -232,16 +261,22 @@ for (const [id, action] of [
     finally { control.disabled = false; }
   });
 }
-byId('chrome-code').addEventListener('click', async () => {
+async function showChromeCode(enroll = false) {
   const current = generation;
-  try {
-    const result = await api('/api/connectors/chrome/code', 'POST');
-    if (current !== generation) return;
-    byId('chrome-origin').value = location.origin;
-    byId('chrome-token').value = result.code;
-    byId('chrome-pairing').hidden = false;
-    announce('Copy the discovery code into the Chrome extension.');
-  } catch (error) { announce(error.message); }
+  const route = enroll ? 'enrollment-code' : 'code';
+  const result = await api('/api/connectors/chrome/' + route, 'POST');
+  if (current !== generation) return;
+  byId('chrome-origin').value = location.origin;
+  byId('chrome-token').value = result.code;
+  byId('chrome-code-purpose').textContent = enroll
+    ? 'Use this code with Enroll Chrome in the extension within 10 minutes.'
+    : 'Use this code with Report active tab in the extension within 10 minutes.';
+  byId('chrome-pairing').hidden = false;
+  byId("chrome-pairing").closest("details").open = true;
+  announce('Copy the code into the Chrome extension.');
+}
+byId('chrome-code').addEventListener('click', () => {
+  showChromeCode().catch(error => announce(error.message));
 });
 byId('bedrock-scan').addEventListener('submit', async event => {
   event.preventDefault();
