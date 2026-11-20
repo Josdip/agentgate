@@ -12,7 +12,7 @@ in this demo is Sonar project file reads and writes.
 | Track | Documented | Implemented | Verification and next gap |
 | --- | --- | --- | --- |
 | Local Sonar | [Setup and isolation](local-sonar-governance.md) | Local discovery, isolated launch, history snapshot, file policies, human review and audit | Live Ollama onboarding and file enforcement were verified in the first-run milestone. Repeat the operator walkthrough on this branch. |
-| Chrome | [Extension setup](external-discovery.md#chatgpt-in-chrome) | A one-use discovery report, explicit enrollment, revocable credential scoped to future manual reports | An operator verified discovery and enrollment in Chrome. The enrolled report receipt was tested over HTTP. A browser retest of the visible row update is pending. Tool actions have no enforcement integration. |
+| Chrome | [Extension setup](external-discovery.md#chatgpt-in-chrome) | A one-use discovery report, explicit enrollment, revocable credential scoped to future manual reports | An operator verified discovery, enrollment, and the visible enrolled report update in Chrome. The report receipt also passed HTTP automation. Tool actions have no enforcement integration. |
 | AWS Bedrock | [CLI and demo mode](external-discovery.md#aws-bedrock-agents) | Read-only discovery and enrollment with an account and region recheck. Explicit demo fixture for offline presentations | Tests verify the fixture and mocked inventory client. An authorized AWS account and live enrollment have not been verified. Tool actions have no enforcement integration. |
 
 The synthetic support, sales and finance application remains available for
