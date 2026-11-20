@@ -21,7 +21,8 @@ does not grant permission to inspect conversations or control cloud tools.
 5. In the ChatGPT inventory row, select **Enroll Chrome**. Copy the new
    enrollment code into the extension and select **Enroll Chrome** there.
    The extension stores a credential for that local AgentGate address.
-   **Report as enrolled** updates last seen. **Revoke Chrome** invalidates
+   **Report as enrolled** shows a receipt time in the popup. The row shows
+   **Enrolled report received** and updates its timestamp. **Revoke Chrome** invalidates
    that credential. A fresh AgentGate demo requires new enrollment.
 
 This is an operator-initiated report from a browser with the connector

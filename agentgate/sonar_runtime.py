@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -9,6 +10,24 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 from uuid import uuid4
 
 SUPPORTED = {"read_file", "write_file"}
+
+
+PROJECT_PATH = r"(?:/project/)?[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*"
+READ_COMMAND = re.compile(
+    rf"read `?(?P<path>{PROJECT_PATH})`?(?: and tell me what it says)?[.!?]?", re.IGNORECASE
+)
+WRITE_COMMAND = re.compile(
+    rf'write "(?P<content>[^"\r\n]*)" to `?(?P<path>{PROJECT_PATH})`?[.!?]?', re.IGNORECASE
+)
+
+
+def project_command(message):
+    for tool, pattern in (("read_file", READ_COMMAND), ("write_file", WRITE_COMMAND)):
+        if match := pattern.fullmatch(
+            message.strip().removesuffix(".").removesuffix("!").removesuffix("?")
+        ):
+            return tool, match.groupdict()
+    return None
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -93,6 +112,24 @@ def main():
     @sonar.app.get("/local-launch-ready")
     def ready():
         return "ready"
+
+    if hasattr(sonar_agent, "direct_action") and hasattr(sonar_agent, "run_direct_action"):
+        original_direct = sonar_agent.direct_action
+        original_run_direct = sonar_agent.run_direct_action
+
+        def direct_action(message):
+            return project_command(message) or original_direct(message)
+
+        def run_direct_action(run, config, audit, emit):
+            name, args = run["direct"]
+            if name not in SUPPORTED:
+                return original_run_direct(run, config, audit, emit)
+            if not config.get("tools") or not config.get("files"):
+                return "Enable tools and project file access to use this command."
+            return broker(gateway_port, token, name, args, run["cancel"])
+
+        sonar_agent.direct_action = direct_action
+        sonar_agent.run_direct_action = run_direct_action
 
     sonar_agent.settings = settings
     sonar_tools.available = available

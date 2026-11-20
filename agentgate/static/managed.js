@@ -104,7 +104,10 @@ function renderDirectory(agent, externalAgents) {
     const location = observed.connector === 'chrome' ? 'Chrome · ChatGPT' : 'AWS Bedrock · ' + observed.scope;
     for (const value of [observed.name, '—', location,
       (observed.enrolled ? 'Enrolled · ' : 'Discovered · ') + observed.provider_status,
-      new Date(observed.scanned * 1000).toLocaleString()]) row.append(element('td', value));
+      new Date(observed.scanned * 1000).toLocaleString(undefined, {
+        year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+        second: 'numeric', fractionalSecondDigits: 3,
+      })]) row.append(element('td', value));
     const controls = element('td', 'Inventory only ');
     if (observed.connector === 'chrome') {
       controls.append(button(observed.enrolled ? 'Revoke Chrome' : 'Enroll Chrome', async () => {

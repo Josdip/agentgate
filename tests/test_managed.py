@@ -305,7 +305,11 @@ def test_browser_discover_enroll_report_and_revoke(gate):
     ]
     assert client.post(prefix + "/enrollment", headers=auth, json=observation).status_code == 401
     auth = {"Authorization": f"Bearer {credential}"}
-    assert client.post(prefix + "/report", headers=auth, json=observation).status_code == 200
+    report = client.post(prefix + "/report", headers=auth, json=observation)
+    assert report.status_code == 200
+    row = client.get("/api/overview", headers=REVIEWER).json()["external_agents"][0]
+    assert row["scanned"] == report.json()["reported_at"]
+    assert row["provider_status"] == "Enrolled report received"
     assert client.get("/api/overview", headers=auth).status_code == 401
     assert client.get("/api/overview", headers=REVIEWER).json()["external_agents"][0]["enrolled"]
     assert client.delete(prefix + "/enrollment", headers=REVIEWER).status_code == 200
@@ -346,3 +350,18 @@ def test_bedrock_demo_enrollment_is_labeled_and_never_calls_aws(tmp_path, monkey
         assert not client.get("/api/overview", headers=REVIEWER).json()["external_agents"][0][
             "enrolled"
         ]
+
+
+def test_direct_project_commands_are_bounded():
+    from agentgate.sonar_runtime import project_command
+
+    assert project_command("Read /project/welcome.txt and tell me what it says.") == (
+        "read_file",
+        {"path": "/project/welcome.txt"},
+    )
+    assert project_command('Write "hello" to review-test.txt') == (
+        "write_file",
+        {"path": "review-test.txt", "content": "hello"},
+    )
+    assert project_command("Read ../../secret.txt") is None
+    assert project_command("Read welcome.txt then delete it") is None

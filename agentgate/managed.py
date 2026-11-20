@@ -382,6 +382,7 @@ def create_managed_app(
     def report_chrome(observation: ChromeObservation, authorization: str = Header(default="")):
         scheme, _, credential = authorization.partition(" ")
         digest = hashlib.sha256(credential.encode()).hexdigest()
+        reported_at = time.time()
         with ledger.transaction() as db:
             bound = db.execute(
                 "SELECT credential_hash FROM external_enrollment WHERE connector='chrome' AND scope='This browser' AND external_id=?",
@@ -390,10 +391,10 @@ def create_managed_app(
             if scheme != "Bearer" or not bound or not hmac.compare_digest(bound[0], digest):
                 raise HTTPException(401, "Chrome enrollment is missing or revoked.")
             db.execute(
-                "UPDATE external_agents SET scanned=? WHERE connector='chrome' AND scope='This browser' AND external_id=?",
-                (time.time(), observation.service),
+                "UPDATE external_agents SET scanned=?, provider_status='Enrolled report received' WHERE connector='chrome' AND scope='This browser' AND external_id=?",
+                (reported_at, observation.service),
             )
-        return {"recorded": True}
+        return {"recorded": True, "reported_at": reported_at}
 
     @app.delete("/api/connectors/chrome/enrollment", dependencies=[reviewer])
     def revoke_chrome():
@@ -401,6 +402,9 @@ def create_managed_app(
         with connector_lock, ledger.transaction() as db:
             pairing_code = ""
             db.execute("DELETE FROM external_enrollment WHERE connector='chrome'")
+            db.execute(
+                "UPDATE external_agents SET provider_status='Tab observed' WHERE connector='chrome'"
+            )
         return {"revoked": True}
 
     def cloud_inventory(scan):

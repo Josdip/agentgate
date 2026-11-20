@@ -39,6 +39,13 @@ distribution's Bubblewrap package before starting. [Ubuntu AppArmor notes](https
    **Activity & decisions** and verify that it succeeds and the write stays
    blocked. Change policies in **Rules**.
 
+For repeatable tests on current Sonar, send one plain command at a time:
+`Read welcome.txt` or `Write "demo" to note.txt`. Enable tools and project
+file access first. These commands go straight to the file broker and still
+follow the configured rule. With the defaults, approve the read in Activity
+and expect the write to be blocked. Set Write to Allow before testing a
+successful write.
+
 Stopping AgentGate stops its managed Sonar session. It leaves standalone
 Sonar open. Previous demo files remain on disk. Set `AGENTGATE_HOME` to
 choose the parent directory for new demos. For persistent AgentGate state across

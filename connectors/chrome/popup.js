@@ -29,10 +29,17 @@ document.getElementById('report').addEventListener('submit', async event => {
       body: JSON.stringify({service: 'chatgpt'}),
       redirect: 'error',
     });
-    if (!response.ok) throw new Error('AgentGate declined the report. Generate a new discovery code.');
+    if (!response.ok) throw new Error(mode === 'paired'
+      ? 'AgentGate declined the report. Check the address and enroll this browser again.'
+      : 'AgentGate declined the code. Generate a new code for this action.');
     if (mode === 'enroll') {
       const {credential: issued} = await response.json();
       await chrome.storage.local.set({[storageKey]: issued});
+    }
+    if (mode === 'paired') {
+      const {reported_at: timestamp} = await response.json();
+      result.textContent = 'Report received at ' + new Date(timestamp * 1000).toLocaleTimeString() + '.';
+      return;
     }
     code.value = '';
     result.textContent = mode === 'enroll' ? 'Chrome enrolled for inventory reporting.' : 'ChatGPT was reported to AgentGate.';
