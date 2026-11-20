@@ -59,7 +59,7 @@ and retrieval are disabled in the managed process.
 Use a disposable project with no secrets. The sandbox shares the host network
 for local Ollama and the broker. Host administrators and standalone
 applications running as the desktop user can act outside the sandbox.
-Browser, cloud, and other operating system connectors are outside this release.
+Browser and cloud inventory enrollment are available as a preview. Other operating systems are outside this release.
 
 AgentGate stores request metadata and a fingerprint. Proposed content and read
 results remain outside its activity database. Approval binds the exact payload

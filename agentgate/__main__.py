@@ -51,6 +51,8 @@ def main(argv=()):
             managed_port,
         )
         app_options = {"launcher": launcher}
+        if env.get("AGENTGATE_DEMO_BEDROCK") == "1":
+            app_options["bedrock_fixture"] = True
         if first_run_code:
             app_options["first_run_code"] = first_run_code
         app = create_managed_app(

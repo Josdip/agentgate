@@ -77,6 +77,11 @@ class BedrockScan(StrictModel):
     profile: str = Field(default="", pattern=r"^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,63})?$")
 
 
+class CloudEnrollment(BedrockScan):
+    scope: str = Field(max_length=100)
+    agent_id: str = Field(pattern=r"^[a-zA-Z0-9]{10}$")
+
+
 class BrowserConnection(StrictModel):
     code: str = Field(min_length=1, max_length=128)
 
@@ -124,6 +129,10 @@ class Ledger:
                     name TEXT NOT NULL, provider_status TEXT NOT NULL, scanned REAL NOT NULL,
                     PRIMARY KEY (connector, scope, external_id)
                 );
+                CREATE TABLE IF NOT EXISTS external_enrollment (
+                    connector TEXT NOT NULL, scope TEXT NOT NULL, external_id TEXT NOT NULL,
+                    credential_hash TEXT, PRIMARY KEY (connector,scope,external_id)
+                );
                 CREATE TABLE IF NOT EXISTS actions (
                     id TEXT PRIMARY KEY, tool TEXT NOT NULL, path TEXT NOT NULL,
                     digest TEXT NOT NULL, size INTEGER, created REAL NOT NULL,
@@ -150,6 +159,12 @@ class Ledger:
                     (connector, scope, identifier, name, state, scanned)
                     for identifier, name, state in agents
                 ],
+            )
+            db.execute(
+                """DELETE FROM external_enrollment WHERE connector=? AND scope=? AND NOT EXISTS (
+                    SELECT 1 FROM external_agents a WHERE a.connector=external_enrollment.connector
+                    AND a.scope=external_enrollment.scope AND a.external_id=external_enrollment.external_id)""",
+                (connector, scope),
             )
 
     def invalid(self, action_id, tool):
@@ -190,6 +205,7 @@ def create_managed_app(
     *,
     launcher=None,
     first_run_code=None,
+    bedrock_fixture=False,
 ):
     if (
         min(len(agent_token), len(reviewer_token)) < 32
@@ -208,6 +224,8 @@ def create_managed_app(
     connector_lock = Lock()
     chrome_code = ""
     chrome_expires = 0.0
+    pairing_code = ""
+    pairing_expires = 0.0
 
     @asynccontextmanager
     async def lifespan(app):
@@ -330,14 +348,108 @@ def create_managed_app(
             chrome_code = ""
         return {"recorded": True}
 
-    @app.post("/api/connectors/bedrock/discovery", dependencies=[reviewer])
-    def scan_bedrock(scan: BedrockScan):
+    @app.post("/api/connectors/chrome/enrollment-code", dependencies=[reviewer])
+    def chrome_enrollment_code():
+        nonlocal pairing_code, pairing_expires
+        with connector_lock, ledger.transaction() as db:
+            if not db.execute("SELECT 1 FROM external_agents WHERE connector='chrome'").fetchone():
+                raise HTTPException(409, "Discover ChatGPT before enrolling Chrome.")
+            pairing_code = secrets.token_urlsafe(32)
+            pairing_expires = time.monotonic() + 600
+            return {"code": pairing_code}
+
+    @app.post("/api/connectors/chrome/enrollment")
+    def enroll_chrome(observation: ChromeObservation, authorization: str = Header(default="")):
+        nonlocal pairing_code
+        with connector_lock, ledger.transaction() as db:
+            if (
+                not pairing_code
+                or time.monotonic() >= pairing_expires
+                or not hmac.compare_digest(
+                    authorization.encode(), f"Bearer {pairing_code}".encode()
+                )
+            ):
+                raise HTTPException(401, "Invalid Chrome enrollment code.")
+            credential = secrets.token_urlsafe(32)
+            db.execute(
+                "INSERT OR REPLACE INTO external_enrollment VALUES ('chrome','This browser',?,?)",
+                (observation.service, hashlib.sha256(credential.encode()).hexdigest()),
+            )
+            pairing_code = ""
+        return {"credential": credential}
+
+    @app.post("/api/connectors/chrome/report")
+    def report_chrome(observation: ChromeObservation, authorization: str = Header(default="")):
+        scheme, _, credential = authorization.partition(" ")
+        digest = hashlib.sha256(credential.encode()).hexdigest()
+        with ledger.transaction() as db:
+            bound = db.execute(
+                "SELECT credential_hash FROM external_enrollment WHERE connector='chrome' AND scope='This browser' AND external_id=?",
+                (observation.service,),
+            ).fetchone()
+            if scheme != "Bearer" or not bound or not hmac.compare_digest(bound[0], digest):
+                raise HTTPException(401, "Chrome enrollment is missing or revoked.")
+            db.execute(
+                "UPDATE external_agents SET scanned=? WHERE connector='chrome' AND scope='This browser' AND external_id=?",
+                (time.time(), observation.service),
+            )
+        return {"recorded": True}
+
+    @app.delete("/api/connectors/chrome/enrollment", dependencies=[reviewer])
+    def revoke_chrome():
+        nonlocal pairing_code
+        with connector_lock, ledger.transaction() as db:
+            pairing_code = ""
+            db.execute("DELETE FROM external_enrollment WHERE connector='chrome'")
+        return {"revoked": True}
+
+    def cloud_inventory(scan):
+        if bedrock_fixture:
+            return (
+                "bedrock-fixture",
+                f"Demo fixture · {scan.region}",
+                [("DEMOAGENT1", "Example Bedrock Agent", "PREPARED")],
+            )
         try:
             account, agents = bedrock_agents(scan.region, scan.profile)
         except CloudInventoryError as exc:
             raise HTTPException(409, str(exc)) from None
-        ledger.record_external("bedrock", f"{account} · {scan.region}", agents)
+        return "bedrock", f"{account} · {scan.region}", agents
+
+    @app.post("/api/connectors/bedrock/discovery", dependencies=[reviewer])
+    def scan_bedrock(scan: BedrockScan):
+        connector, scope, agents = cloud_inventory(scan)
+        ledger.record_external(connector, scope, agents)
         return {"count": len(agents)}
+
+    @app.post("/api/connectors/bedrock/enrollment", dependencies=[reviewer])
+    def enroll_bedrock(selection: CloudEnrollment):
+        with ledger.transaction() as db:
+            if not db.execute(
+                "SELECT 1 FROM external_agents WHERE connector IN ('bedrock','bedrock-fixture') AND scope=? AND external_id=?",
+                (selection.scope, selection.agent_id),
+            ).fetchone():
+                raise HTTPException(409, "Discover the Bedrock agent before enrollment.")
+        connector, scope, agents = cloud_inventory(selection)
+        if scope != selection.scope or not any(agent[0] == selection.agent_id for agent in agents):
+            raise HTTPException(
+                409, "The selected agent could not be verified in that account and region."
+            )
+        with ledger.transaction() as db:
+            db.execute(
+                "INSERT OR REPLACE INTO external_enrollment VALUES (?,?,?,NULL)",
+                (connector, scope, selection.agent_id),
+            )
+        return {"enrolled": True}
+
+    @app.delete("/api/connectors/bedrock/enrollment", dependencies=[reviewer])
+    def revoke_bedrock(selection: CloudEnrollment):
+        with ledger.transaction() as db:
+            db.execute(
+                "DELETE FROM external_enrollment WHERE connector IN ('bedrock','bedrock-fixture') AND scope=? AND external_id=?",
+                (selection.scope, selection.agent_id),
+            )
+        return {"revoked": True}
 
     @app.post("/api/discovery", dependencies=[reviewer])
     def scan():
@@ -384,10 +496,13 @@ def create_managed_app(
                     agents[0]["url"] = launcher.url
             return {
                 "agents": agents,
+                "bedrock_fixture": bedrock_fixture,
                 "external_agents": [
                     dict(row)
                     for row in db.execute(
-                        "SELECT * FROM external_agents ORDER BY connector, scope, name, external_id"
+                        """SELECT a.*, e.external_id IS NOT NULL AS enrolled FROM external_agents a
+                        LEFT JOIN external_enrollment e USING (connector,scope,external_id)
+                        ORDER BY a.connector,a.scope,a.name,a.external_id"""
                     )
                 ],
                 "counts": dict(

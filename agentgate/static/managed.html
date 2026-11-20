@@ -49,11 +49,11 @@
           <div id="chrome-pairing" hidden>
             <label for="chrome-origin">AgentGate address</label><input id="chrome-origin" readonly>
             <label for="chrome-token">One-use discovery code</label><input id="chrome-token" readonly>
-            <p class="help">The code expires in 10 minutes.</p>
+            <p id="chrome-code-purpose" class="help"></p>
           </div>
         </details>
         <details><summary>AWS Bedrock Agents</summary>
-          <p>Scan one region using the AWS CLI session on this computer.</p>
+          <p id="bedrock-source">Scan one region using the AWS CLI session on this computer.</p>
           <form id="bedrock-scan" class="field-inline">
             <label for="bedrock-region">AWS region</label><input id="bedrock-region" placeholder="us-east-1" required maxlength="40">
             <label for="bedrock-profile">AWS CLI profile (optional)</label><input id="bedrock-profile" maxlength="64">

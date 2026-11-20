@@ -3,7 +3,7 @@
   "name": "AgentGate Browser Discovery",
   "version": "0.1.0",
   "description": "Report the active ChatGPT tab to a local AgentGate inventory.",
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "storage"],
   "host_permissions": ["http://127.0.0.1/*"],
   "action": {"default_popup": "popup.html"}
 }

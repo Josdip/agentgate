@@ -283,3 +283,66 @@ def test_bedrock_refresh_is_scoped_and_does_not_change_sonar(gate, monkeypatch):
     assert len(data["external_agents"]) == 1
     assert data["external_agents"][0]["scope"] == "123456789012 · us-west-2"
     assert limits == [("us-east-1", "inventory"), ("us-west-2", ""), ("us-east-1", "")]
+
+
+def test_browser_discover_enroll_report_and_revoke(gate):
+    client, _ = gate
+    prefix = "/api/connectors/chrome"
+    observation = {"service": "chatgpt"}
+    assert client.post(prefix + "/enrollment-code", headers=REVIEWER).status_code == 409
+    code = client.post(prefix + "/code", headers=REVIEWER).json()["code"]
+    assert (
+        client.post(
+            prefix + "/observation", headers={"Authorization": f"Bearer {code}"}, json=observation
+        ).status_code
+        == 200
+    )
+    assert client.post(prefix + "/enrollment-code", headers=AGENT).status_code == 401
+    code = client.post(prefix + "/enrollment-code", headers=REVIEWER).json()["code"]
+    auth = {"Authorization": f"Bearer {code}"}
+    credential = client.post(prefix + "/enrollment", headers=auth, json=observation).json()[
+        "credential"
+    ]
+    assert client.post(prefix + "/enrollment", headers=auth, json=observation).status_code == 401
+    auth = {"Authorization": f"Bearer {credential}"}
+    assert client.post(prefix + "/report", headers=auth, json=observation).status_code == 200
+    assert client.get("/api/overview", headers=auth).status_code == 401
+    assert client.get("/api/overview", headers=REVIEWER).json()["external_agents"][0]["enrolled"]
+    assert client.delete(prefix + "/enrollment", headers=REVIEWER).status_code == 200
+    assert client.post(prefix + "/report", headers=auth, json=observation).status_code == 401
+
+
+def test_bedrock_demo_enrollment_is_labeled_and_never_calls_aws(tmp_path, monkeypatch):
+    def forbidden(*args):
+        pytest.fail("Fixture must never contact AWS")
+
+    monkeypatch.setattr("agentgate.managed.bedrock_agents", forbidden)
+    app = create_managed_app(
+        tmp_path / "test.sqlite3", tmp_path, AGENT_TOKEN, REVIEWER_TOKEN, bedrock_fixture=True
+    )
+    with TestClient(app) as client:
+        route = "/api/connectors/bedrock"
+        request = {
+            "region": "us-east-1",
+            "scope": "Demo fixture · us-east-1",
+            "agent_id": "DEMOAGENT1",
+        }
+        assert client.post(route + "/enrollment", headers=REVIEWER, json=request).status_code == 409
+        assert (
+            client.post(
+                route + "/discovery", headers=REVIEWER, json={"region": "us-east-1"}
+            ).status_code
+            == 200
+        )
+        assert client.post(route + "/enrollment", headers=REVIEWER, json=request).status_code == 200
+        discovered = client.get("/api/overview", headers=REVIEWER).json()["external_agents"][0]
+        assert (discovered["connector"], discovered["enrolled"]) == ("bedrock-fixture", 1)
+        assert (
+            client.request(
+                "DELETE", route + "/enrollment", headers=REVIEWER, json=request
+            ).status_code
+            == 200
+        )
+        assert not client.get("/api/overview", headers=REVIEWER).json()["external_agents"][0][
+            "enrolled"
+        ]
